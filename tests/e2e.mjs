@@ -56,6 +56,8 @@ try {
   await page.getByRole('button',{name:'關閉環境檢查'}).click();
   for (const id of ids) { await page.getByTestId(`pane-${id}`).getByRole('button',{name:'▶ 啟動',exact:true}).click(); await waitText(page,id,`READY:${id}:TTY=true`); }
   await expect.poll(async()=> (await buffer(page,'codex')).replace(/\s/g,'')).toContain('ARGS:codex:["--model","fixture-model"]');
+  await input(page,'codex','cwd');
+  await expect.poll(async()=> (await buffer(page,'codex')).replace(/\s/g,''),{timeout:20000}).toContain(('CWD:codex:'+project).replace(/\s/g,''));
   checks.push('manual model setting passes the correct CLI flag');
   await expect(page.getByRole('button',{name:'選擇專案…',exact:true})).toBeDisabled();
   for (const id of ids) { await input(page,id,`hello-${id}`); await waitText(page,id,`ECHO:${id}:hello-${id}`); }
