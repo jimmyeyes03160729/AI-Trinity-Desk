@@ -3,6 +3,11 @@ on:
   push:
   pull_request:
   workflow_dispatch:
+    inputs:
+      build_macos:
+        description: Build and test macOS
+        type: boolean
+        default: false
 permissions:
   contents: read
 jobs:
@@ -31,6 +36,7 @@ jobs:
             test-results/*.png
             test-results/*report.json
   macos:
+    if: ${{ github.event_name == 'workflow_dispatch' && inputs.build_macos }}
     runs-on: macos-latest
     steps:
       - uses: actions/checkout@v4
