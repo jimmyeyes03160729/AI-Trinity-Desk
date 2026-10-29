@@ -1,0 +1,108 @@
+{
+  "name": "ai-trinity-desk",
+  "productName": "AI Trinity Desk",
+  "version": "1.3.0",
+  "description": "Three independent local AI CLI terminals for your project",
+  "author": "AI Trinity Desk contributors",
+  "license": "MIT",
+  "overrides": {
+    "dotenv-expand": "11.0.7"
+  },
+  "private": true,
+  "type": "module",
+  "engines": {
+    "node": ">=22.12.0"
+  },
+  "main": "dist-electron/main.cjs",
+  "scripts": {
+    "dev": "node scripts/dev.mjs",
+    "typecheck": "tsc --noEmit",
+    "build:electron": "node scripts/build-electron.mjs",
+    "build": "npm run typecheck && vite build && npm run build:electron",
+    "start": "electron .",
+    "test": "tsx --test tests/*.test.ts",
+    "test:e2e": "npm run build && node tests/e2e.mjs && node tests/discussion-e2e.mjs && node tests/market-e2e.mjs && node tests/cli-tasks-e2e.mjs",
+    "test:install-sources": "npm run build:electron && node scripts/check-install-sources.mjs",
+    "dist:win": "npm run build && electron-builder --win nsis --x64",
+    "dist:mac": "npm run build && electron-builder --mac",
+    "dist:mac:arm64": "npm run build && electron-builder --mac --arm64",
+    "dist:mac:x64": "npm run build && electron-builder --mac --x64",
+    "postinstall": "node scripts/check-native.mjs",
+    "rebuild:native": "electron-rebuild -f -w node-pty"
+  },
+  "dependencies": {
+    "@xterm/addon-fit": "^0.11.0",
+    "@xterm/xterm": "^6.0.0",
+    "cheerio": "^1.0.0",
+    "node-pty": "^1.2.0",
+    "react": "^19.2.0",
+    "react-dom": "^19.2.0",
+    "yauzl": "^3.4.0",
+    "zod": "^4.1.0"
+  },
+  "devDependencies": {
+    "@electron/rebuild": "^4.0.0",
+    "@playwright/test": "^1.56.0",
+    "@types/node": "^24.0.0",
+    "@types/react": "^19.2.0",
+    "@types/react-dom": "^19.2.0",
+    "@types/yauzl": "^3.4.0",
+    "@vitejs/plugin-react": "^5.1.0",
+    "electron": "^45.1.0",
+    "electron-builder": "^26.0.0",
+    "esbuild": "^0.28.0",
+    "tsx": "^4.20.0",
+    "typescript": "^5.9.0",
+    "vite": "^8.3.5"
+  },
+  "build": {
+    "appId": "desk.ai.trinity",
+    "directories": {
+      "output": "release"
+    },
+    "files": [
+      "dist/**/*",
+      "dist-electron/**/*",
+      "!dist-electron/install-probe.*",
+      "package.json"
+    ],
+    "asar": true,
+    "asarUnpack": [
+      "node_modules/node-pty/**/*"
+    ],
+    "npmRebuild": false,
+    "artifactName": "AI-Trinity-Desk-${version}-${os}-${arch}.${ext}",
+    "win": {
+      "target": [
+        {
+          "target": "nsis",
+          "arch": [
+            "x64"
+          ]
+        }
+      ],
+      "icon": "build/icon.ico",
+      "signExecutable": false
+    },
+    "nsis": {
+      "oneClick": false,
+      "perMachine": false,
+      "allowToChangeInstallationDirectory": true,
+      "createDesktopShortcut": true
+    },
+    "mac": {
+      "target": [
+        "dmg",
+        "zip"
+      ],
+      "icon": "build/icon.png",
+      "category": "public.app-category.developer-tools",
+      "hardenedRuntime": true,
+      "entitlements": "build/entitlements.mac.plist",
+      "entitlementsInherit": "build/entitlements.mac.plist"
+    },
+    "dmg": {
+      "title": "AI Trinity Desk"
+    }
+  }
+}

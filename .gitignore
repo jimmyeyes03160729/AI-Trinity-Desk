@@ -1,0 +1,10 @@
+node_modules/
+dist/
+dist-electron/
+release/
+test-results/
+*.log
+.DS_Store
+
+evidence/
+VALIDATION*.md
