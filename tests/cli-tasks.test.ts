@@ -28,7 +28,7 @@ test('task store preserves multiple conversations, serializes updates and fails 
 test('individual CLI tasks retain project/model, reject archive while live, restore metadata and refuse unknown resume',async()=>{
   const root=await mkdtemp(path.join(os.tmpdir(),'trinity-tasks-run-')),settings=defaultSettings();settings.projectPath=root;settings.models.codex='selected-model';settings.commands.codex.executable=process.execPath.replace(/[^\\/]+$/,'codex.exe');
   // The command resolver needs an actual file, while spawn remains a fake PTY.
-  const executable=path.join(root,'codex.exe');await writeFile(executable,'fixture');settings.commands.codex.executable=executable;
+  const executable=path.join(root,'codex.exe');await writeFile(executable,'fixture',{mode:0o755});settings.commands.codex.executable=executable;
   const seen:any[]=[];let exit:((event:{exitCode:number})=>void)|undefined;
   const spawn:any=(_file:string,args:string[],options:any)=>{seen.push({args,options});return {pid:2147483000,onData:()=>{},onExit:(callback:any)=>{exit=callback;},write:()=>{},resize:()=>{},pause:()=>{},resume:()=>{},kill:()=>exit?.({exitCode:0})};};
   const store=new CliTaskStore(path.join(root,'index.json'));const manager=new CliTasks(store,path.join(root,'tasks'),spawn,process.env,()=>settings,()=>{},()=>{});
@@ -42,7 +42,7 @@ test('individual CLI tasks retain project/model, reject archive while live, rest
 });
 test('crash recovery recovers the exact captured session rather than starting another conversation',async()=>{
   const root=await mkdtemp(path.join(os.tmpdir(),'trinity-tasks-recover-')),task={...fixture(),launched:true},store=new CliTaskStore(path.join(root,'index.json'));await store.mutate(s=>s.tasks.push(task));await mkdir(path.join(root,'tasks',task.id),{recursive:true});const native=randomUUID();await writeFile(path.join(root,'tasks',task.id,'session.json'),JSON.stringify({id:native}));
-  const settings=defaultSettings(),exe=path.join(root,'codex.exe');await writeFile(exe,'fixture');settings.commands.codex.executable=exe;let args:string[]=[];let onExit:any;
+  const settings=defaultSettings(),exe=path.join(root,'codex.exe');await writeFile(exe,'fixture',{mode:0o755});settings.commands.codex.executable=exe;let args:string[]=[];let onExit:any;
   const spawn:any=(_file:string,value:string[])=>{args=value;return {pid:2147483000,onData:()=>{},onExit:(callback:any)=>{onExit=callback;},write:()=>{},resize:()=>{},pause:()=>{},resume:()=>{},kill:()=>onExit({exitCode:0})};};
   const manager=new CliTasks(store,path.join(root,'tasks'),spawn,process.env,()=>settings,()=>{},()=>{});await manager.start(task.id,80,24);assert.ok(args.includes(native));assert.equal((await manager.list()).tasks[0].nativeSessionId,native);await manager.shutdown();
 });

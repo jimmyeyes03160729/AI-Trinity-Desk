@@ -1,6 +1,6 @@
 import {test} from 'node:test';
 import assert from 'node:assert/strict';
-import {mkdtemp,readFile,mkdir,writeFile,symlink} from 'node:fs/promises';
+import {mkdtemp,readFile,mkdir,writeFile,symlink,realpath} from 'node:fs/promises';
 import path from 'node:path';
 import os from 'node:os';
 import {extractSkillSummary,parseSummaryTranslations,inferSummaryTags,SkillSummaries} from '../electron/skill-summary';
@@ -35,7 +35,7 @@ test('skill archives reject traversal, symbolic links and mismatched skill names
   const files=await readSkillArchive(archive(),skill,signal);assert.equal(files.size,2);assert.ok(files.has('SKILL.md'));assert.ok(files.has('scripts/never-run.js'));
 });
 test('one click installs selected AI folders, persists ownership and never runs packaged scripts',async()=>{
-  const root=await mkdtemp(path.join(os.tmpdir(),'trinity-skill-install-')),roots=skillRoots(path.join(root,'home'));let downloads=0;
+  const root=await realpath(await mkdtemp(path.join(os.tmpdir(),'trinity-skill-install-'))),roots=skillRoots(path.join(root,'home'));let downloads=0;
   const installer=new SkillInstaller(()=>skill,roots,path.join(root,'installed.json'),async url=>{downloads++;return String(url).includes('api.github.com')?Response.json([{sha:'a'.repeat(40)}]):new Response(new Uint8Array(archive()));},()=>{});
   const result=await installer.install({id:skill.id,targets:['claude','codex','antigravity']});assert.equal(result.filter(s=>s.status==='installed').length,3);assert.equal(downloads,2);
   for(const ai of ['claude','codex','antigravity'] as const)assert.equal(await readFile(path.join(roots[ai],'demo','SKILL.md'),'utf8'),manifest);
