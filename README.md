@@ -226,7 +226,7 @@ npx electron-builder --win nsis --x64 --config.electronDist=node_modules/electro
 
 Windows 安裝包輸出至 `release/`，`release/win-unpacked/` 為解包後的應用程式。建議 Windows 11 x64，最低須具備 Windows 10 1809 以上的 ConPTY 支援並符合所用 Electron 的系統需求。
 
-node-pty 1.2 使用 Node-API 原生元件，已隨 npm 套件附帶常見平台的預編譯檔，因此本專案停用 electron-builder 的無條件原生重編。`postinstall` 會檢查元件存在並可載入。若你自行修改 node-pty、使用未提供預編譯檔的平台或需要從原始碼編譯，安裝 Windows Visual Studio Build Tools「使用 C++ 的桌面開發」（含 Windows SDK，必要時安裝 Spectre 程式庫）及 Python，然後執行 `npm run rebuild:native`。macOS 從原始碼重編則需要 Xcode Command Line Tools。
+node-pty 1.1 使用 Node-API 原生元件，已隨 npm 套件附帶常見平台的預編譯檔，因此本專案停用 electron-builder 的無條件原生重編。`postinstall` 會檢查元件存在並可載入。若你自行修改 node-pty、使用未提供預編譯檔的平台或需要從原始碼編譯，安裝 Windows Visual Studio Build Tools「使用 C++ 的桌面開發」（含 Windows SDK，必要時安裝 Spectre 程式庫）及 Python，然後執行 `npm run rebuild:native`。macOS 從原始碼重編則需要 Xcode Command Line Tools。
 
 ## macOS 建置
 
