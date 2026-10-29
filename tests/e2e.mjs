@@ -28,7 +28,7 @@ async function buffer(page,id) {
   // Read rendered accessibility/text canvas through xterm's public DOM rows.
   return page.getByTestId(`terminal-${id}`).locator('.xterm-rows').innerText();
 }
-async function waitText(page,id,text) { await expect.poll(() => buffer(page,id),{timeout:20000}).toContain(text); }
+async function waitText(page,id,text) { await expect.poll(async() => (await buffer(page,id)).replace(/\r?\n/g,''),{timeout:20000}).toContain(text); }
 async function input(page,id,line) {
   const area=page.getByTestId(`terminal-${id}`).locator('textarea'); await area.focus(); await page.keyboard.type(line); await page.keyboard.press('Enter');
 }
