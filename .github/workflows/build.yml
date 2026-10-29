@@ -17,7 +17,8 @@ jobs:
       - run: npm ci
       - run: npm test
       - run: npm run test:e2e
-      - run: npm run dist:win
+        timeout-minutes: 5
+      - run: npm run dist:win -- --publish never
       - uses: actions/upload-artifact@v4
         with:
           name: windows-x64-installer
@@ -40,7 +41,8 @@ jobs:
       - run: npm ci
       - run: npm test
       - run: npm run test:e2e
-      - run: npm run dist:mac
+        timeout-minutes: 5
+      - run: npm run dist:mac -- --publish never
         env:
           CSC_IDENTITY_AUTO_DISCOVERY: false
       - uses: actions/upload-artifact@v4

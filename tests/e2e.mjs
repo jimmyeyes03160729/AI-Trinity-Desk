@@ -28,7 +28,10 @@ async function buffer(page,id) {
   // Read rendered accessibility/text canvas through xterm's public DOM rows.
   return page.getByTestId(`terminal-${id}`).locator('.xterm-rows').innerText();
 }
-async function waitText(page,id,text) { await expect.poll(async() => (await buffer(page,id)).replace(/\r?\n/g,''),{timeout:20000}).toContain(text); }
+async function waitText(page,id,text) {
+  try { await expect.poll(async() => (await buffer(page,id)).replace(/\r?\n/g,''),{timeout:20000}).toContain(text); }
+  catch (error) { const pane=page.getByTestId(`pane-${id}`);const alerts=await pane.getByRole('alert').allTextContents();const status=await pane.locator('.status').innerText();throw new Error(`終端 ${id} 狀態 ${status}；訊息 ${alerts.join(' | ')||'無'}；${String(error)}`); }
+}
 async function input(page,id,line) {
   const area=page.getByTestId(`terminal-${id}`).locator('textarea'); await area.focus(); await page.keyboard.type(line); await page.keyboard.press('Enter');
 }
