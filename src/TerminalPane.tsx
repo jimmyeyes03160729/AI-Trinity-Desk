@@ -26,6 +26,7 @@ export default function TerminalPane({ id, command, model, project, fontSize, on
   const [localize, setLocalize] = useState(false);
   const localizeRef = useRef(false); localizeRef.current = localize;
   const translator = useRef(new TerminalLocalization(id));
+  const translationTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
   const activeCallback = useRef(onActive); activeCallback.current = onActive;
   const attaching = useRef(false);
   // A pane may open while its CLI already runs: after a page reload, from a
@@ -50,13 +51,16 @@ export default function TerminalPane({ id, command, model, project, fontSize, on
   consume.current = event => {
     if (event.id !== id || event.session !== session.current?.session) return;
     if (event.type === 'data') {
+      clearTimeout(translationTimer.current);
       term.current?.write(translator.current.feed(event.data, localizeRef.current), () => window.desk.ack(id, event.session, event.data.length));
+      translationTimer.current = setTimeout(() => { const pending = translator.current.drain(); if (pending) term.current?.write(pending); }, 40);
       outputTail.current=(outputTail.current+event.data).slice(-16000);
       const message=serviceError(id,outputTail.current);
       if(message&&message!==failure.current){failure.current=message;setError(message);}
     }
     if (event.type === 'exit') {
       session.current = null; setPid(undefined); setStatus('exited'); activeCallback.current(id, false);
+      clearTimeout(translationTimer.current); const pending = translator.current.drain(); if (pending) term.current?.write(pending);
       term.current?.writeln(`\r\n\x1b[90m[工作階段結束 · 代碼 ${event.exitCode}${event.signal ? ' · 訊號 ' + event.signal : ''}]\x1b[0m`);
       if (event.exitCode !== 0) setError(failure.current||`程序以代碼 ${event.exitCode} 結束，請查看上方輸出與啟動設定。`);
     }
@@ -103,7 +107,7 @@ export default function TerminalPane({ id, command, model, project, fontSize, on
       if (!session.current && event.type === 'data') { void attach.current(); return; }
       consume.current(event);
     });
-    return () => { alive=false;observer.disconnect();window.removeEventListener('resize',fitLater); cancelAnimationFrame(frame); off(); input.dispose(); resize.dispose(); container.current?.removeEventListener('paste', pasteListener, true); terminal.dispose(); term.current = null; };
+    return () => { alive=false;clearTimeout(translationTimer.current);observer.disconnect();window.removeEventListener('resize',fitLater); cancelAnimationFrame(frame); off(); input.dispose(); resize.dispose(); container.current?.removeEventListener('paste', pasteListener, true); terminal.dispose(); term.current = null; };
     // Terminal instances remain stable while settings and layout change.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [id]);
@@ -142,7 +146,7 @@ export default function TerminalPane({ id, command, model, project, fontSize, on
   const names = { idle: '待命', starting: '啟動中', running: '執行中', stopping: '停止中', exited: '已結束', error: '啟動失敗' };
   return <section className={`terminal-pane ${id}`} data-testid={`pane-${id}`} aria-label={labels[id]}>
     <header className="pane-header"><div className="pane-title"><span className="agent-mark">{id === 'claude' ? 'C' : id === 'codex' ? 'X' : 'A'}</span><div><h2>{labels[id]}</h2><span className={`status ${status}`}><i />{names[status]}{pid ? ` · PID ${pid}` : ''}</span></div></div><button className="icon-button" aria-label={`${labels[id]} 設定`} title="啟動設定" onClick={onSettings}>⚙</button></header>
-    <div className="command-line" title={[command.executable,...command.args].join(' ')}><span>›</span> {command.executable}{command.args.length > 0 ? ` ${command.args.join(' ')}` : ''}<button className="model-button" onClick={onModels} title="下次啟動套用；目前工作階段可手動輸入 /model">模型：{model||'CLI 預設'}</button><button className="model-button" onClick={() => setShowSkills(true)} aria-label={`${labels[id]} 選擇 Skill`}>Skills</button>{id !== 'antigravity' && <button className="model-button" aria-pressed={localize} aria-label={`${labels[id]} 繁體中文顯示`} title="實驗功能：轉換後續畫面的固定文字，可能影響一般輸出；不修改 CLI 或輸入" onClick={() => setLocalize(value => !value)}>繁中{localize ? ' ✓' : ''}</button>}</div>
+    <div className="command-line" title={[command.executable,...command.args].join(' ')}><span>›</span> {command.executable}{command.args.length > 0 ? ` ${command.args.join(' ')}` : ''}<button className="model-button" onClick={onModels} title="下次啟動套用；目前工作階段可手動輸入 /model">模型：{model||'CLI 預設'}</button><button className="model-button" onClick={() => setShowSkills(true)} aria-label={`${labels[id]} 選擇 Skill`}>Skills</button>{id !== 'antigravity' && <button className="model-button" aria-pressed={localize} aria-label={`${labels[id]} 繁體中文顯示`} title="實驗功能：只轉換切換後的新輸出；啟動前開啟可翻譯啟動畫面。可能影響一般輸出，不修改 CLI 或輸入。" onClick={() => { clearTimeout(translationTimer.current); const pending = translator.current.drain(); if (pending) term.current?.write(pending); setLocalize(value => !value); }}>繁中{localize ? ' ✓' : ''}</button>}</div>
     <div className="terminal-toolbar"><div><button disabled={busy || running || !project} onClick={() => void start()}>▶ 啟動</button><button disabled={!running || busy} onClick={() => void stop()}>■ 停止</button><button disabled={!running || busy} onClick={() => void stop(true)}>↻ 重啟</button></div><div><button title="選取文字後複製" onClick={() => void copySelection()}>{copied ? '已複製' : '複製'}</button><button onClick={() => void paste()} disabled={!running}>貼上</button><button title="清除畫面，不會停止程序" onClick={() => term.current?.clear()}>清屏</button></div></div>
     {error && <div role="alert" className="pane-error">{error}<button aria-label="關閉訊息" onClick={() => setError('')}>×</button></div>}
     <div className="terminal-frame"><div className="terminal-surface" ref={container} data-testid={`terminal-${id}`} /></div>

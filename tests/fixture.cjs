@@ -8,6 +8,8 @@ terminalInput.on('SIGINT',()=>console.log(`INTERRUPT:${tag}`));
 terminalInput.on('line', line => {
   if (line === 'cwd') { console.log(`CWD:${tag}:${process.cwd()}`); return; }
   if (line === 'ui') { console.log('Accept'); return; }
+  if (line === 'status-ui') { console.log('\x1b[33m▶▶ auto mode on\x1b[0m (shift+tab to cycle) · esc to interrupt'); console.log('✻ Spinning… (9s · ↓ 247 tokens)'); return; }
+  if (line === 'codex-ui') { console.log('› Ask Codex to do anything'); console.log('? for shortcuts   100% context left'); return; }
   if(line==='fullscreen'){
     process.stdout._refreshSize();const rows=process.stdout.rows;
     process.stdout.write(`\x1b[?1049h\x1b[2J\x1b[HHEADER:${tag}\x1b[${Math.max(1,rows-2)};1HPROMPT:${tag}\x1b[${Math.max(1,rows-1)};1HSTATUS:${tag}\x1b[${rows};1HFOOTER:${tag}`);return;

@@ -69,6 +69,18 @@ try {
     await waitText(page,ids[i],`ECHO:${ids[i]}:${ids[i]==='codex'?'$':'/'}trinity-fixture`);
   }
   checks.push('project skill picker displays Chinese descriptions and inserts CLI-specific references without submitting');
+  await page.getByRole('button',{name:'Claude Code 繁體中文顯示'}).click();
+  await input(page,'claude','status-ui');
+  await waitText(page,'claude','自動模式'); await waitText(page,'claude','處理中');
+  await expect.poll(async()=>await buffer(page,'claude')).toContain('切換');
+  await expect.poll(async()=>await buffer(page,'claude')).toContain('中斷');
+  await page.getByRole('button',{name:'Claude Code 繁體中文顯示'}).click();
+  checks.push('Traditional Chinese display translates combined Claude status fragments with ANSI styling');
+  await page.getByRole('button',{name:'Codex CLI 繁體中文顯示'}).click();
+  await input(page,'codex','codex-ui');
+  await waitText(page,'codex','詢問 Codex 任務'); await waitText(page,'codex','快捷鍵');
+  await page.getByRole('button',{name:'Codex CLI 繁體中文顯示'}).click();
+  checks.push('Traditional Chinese display translates combined Codex prompt and shortcuts');
   await expect.poll(async()=> (await buffer(page,'codex')).replace(/\s/g,'')).toContain('ARGS:codex:["--model","fixture-model"]');
   await input(page,'codex','cwd');
   await expect.poll(async()=> (await buffer(page,'codex')).replace(/\s/g,''),{timeout:20000}).toContain(('CWD:codex:'+project).replace(/\s/g,''));
