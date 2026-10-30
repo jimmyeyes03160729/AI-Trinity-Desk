@@ -13,6 +13,7 @@ import {DiscussionStore} from './discussion-store';
 import {SkillMarket} from './skill-market';
 import {SkillSummaries} from './skill-summary';
 import {SkillInstaller,skillRoots} from './skill-install';
+import {LocalSkills} from './local-skills';
 import { resolveExecutable, terminalEnvironment } from './commands';
 import { ackSchema, inputSchema, paneIds, paneIdSchema, projectFor, resizeSchema, settingsSchema, startSchema, discussionSchema, continueDiscussionSchema, skillEnrichSchema, type DiscussionState, type PaneId, type Result, type Settings, type TerminalEvent, type TerminalAttach } from './contracts';
 
@@ -83,6 +84,7 @@ export async function createBackend(host: BackendHost) {
   const skillSummaries=new SkillSummaries(id=>skillMarket.lookup(id),skill=>skillMarket.update(skill),()=>settings,createDiscussionRunner(userData,env),systemFetch,path.join(userData,'skill-summaries.json'));
   skillMarket.setSummaryLoader(ids=>skillSummaries.prime(ids));
   const skillInstaller=new SkillInstaller(id=>skillMarket.lookup(id),skillRoots(host.home),path.join(userData,'skill-installations.json'),limitedSystemFetch(64*1024*1024),states=>host.emit('skill-install:event',states));
+  const localSkills=new LocalSkills(host.home,userData,()=>settings,createDiscussionRunner(userData,env));
   const discussionStore=new DiscussionStore(path.join(userData,'discussions','latest.json'));
   let restoredDiscussion:DiscussionState|undefined;
   try{restoredDiscussion=await discussionStore.load();}catch(error){restoredDiscussion={status:'idle',messages:[],updatedAt:new Date().toISOString(),storageError:error instanceof Error?error.message:String(error)};}
@@ -150,6 +152,8 @@ export async function createBackend(host: BackendHost) {
   handle('market:cancel-translation',()=>{skillSummaries.cancel();return null;});
   handle('skill:install',value=>skillInstaller.install(value));
   handle('skill:installed',()=>skillInstaller.snapshot());
+  handle('local-skills:list',value=>localSkills.list(value));
+  handle('local-skills:translate',value=>localSkills.translate(value));
   handle('skill:cancel',value=>{skillInstaller.cancel(z.string().min(1).max(300).parse(value));return null;});
   handle('discussion:state',()=>discussions.snapshot);
   handle('discussion:start',value=>{
@@ -205,8 +209,8 @@ export async function createBackend(host: BackendHost) {
     }); },
     get busy() { return !!sessions?.active||installers.active||discussions.active||skillInstaller.active||skillSummaries.active; },
     flush: () => discussions.flush(),
-    shutdown: () => Promise.all([sessions?.stopAll(),installers.shutdown(),discussions.stop(),skillInstaller.shutdown(),skillSummaries.shutdown()]),
-    abort() { void sessions?.stopAll().catch(() => {});void discussions.stop();void skillInstaller.shutdown();void skillSummaries.shutdown(); for (const id of paneIds) void installers.cancel(id); },
+    shutdown: () => Promise.all([sessions?.stopAll(),installers.shutdown(),discussions.stop(),skillInstaller.shutdown(),skillSummaries.shutdown(),localSkills.shutdown()]),
+    abort() { void sessions?.stopAll().catch(() => {});void discussions.stop();void skillInstaller.shutdown();void skillSummaries.shutdown();void localSkills.shutdown(); for (const id of paneIds) void installers.cancel(id); },
     reopen: () => installers.reopen(),
     installersActive: () => installers.active
   };

@@ -13,6 +13,8 @@ const api: DeskApi = {
   cancelSkillTranslation:()=>ipcRenderer.invoke('market:cancel-translation'),
   installSkill:value=>ipcRenderer.invoke('skill:install',value),
   skillInstallations:()=>ipcRenderer.invoke('skill:installed'),
+  localSkills:id=>ipcRenderer.invoke('local-skills:list',id),
+  translateLocalSkill:value=>ipcRenderer.invoke('local-skills:translate',value),
   cancelSkillInstall:id=>ipcRenderer.invoke('skill:cancel',id),
   onSkillInstall:listener=>{const handler=(_:Electron.IpcRendererEvent,states:SkillInstallState[])=>listener(states);ipcRenderer.on('skill-install:event',handler);return()=>ipcRenderer.removeListener('skill-install:event',handler);},
   discussionState:()=>ipcRenderer.invoke('discussion:state'),

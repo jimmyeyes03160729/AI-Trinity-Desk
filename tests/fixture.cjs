@@ -7,6 +7,7 @@ const terminalInput=readline.createInterface({ input: process.stdin });
 terminalInput.on('SIGINT',()=>console.log(`INTERRUPT:${tag}`));
 terminalInput.on('line', line => {
   if (line === 'cwd') { console.log(`CWD:${tag}:${process.cwd()}`); return; }
+  if (line === 'ui') { console.log('Accept'); return; }
   if(line==='fullscreen'){
     process.stdout._refreshSize();const rows=process.stdout.rows;
     process.stdout.write(`\x1b[?1049h\x1b[2J\x1b[HHEADER:${tag}\x1b[${Math.max(1,rows-2)};1HPROMPT:${tag}\x1b[${Math.max(1,rows-1)};1HSTATUS:${tag}\x1b[${rows};1HFOOTER:${tag}`);return;

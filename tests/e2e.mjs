@@ -8,6 +8,7 @@ const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const artifacts = path.join(root, 'test-results'); await fs.mkdir(artifacts, { recursive:true });
 const data = await fs.mkdtemp(path.join(artifacts, 'profile-'));
 const project = path.join(data, '專案 with spaces'); await fs.mkdir(project);
+for (const dir of ['.agents', '.claude']) { const skill = path.join(project, dir, 'skills', 'trinity-fixture'); await fs.mkdir(skill, { recursive: true }); await fs.writeFile(path.join(skill, 'SKILL.md'), '---\nname: trinity-fixture\ndescription: 測試技能說明\n---\n'); }
 // Never install or alter real vendor CLIs during desktop regression tests.
 await fs.writeFile(path.join(data,'settings.json'),JSON.stringify({version:1,projectPath:'',commands:{claude:{executable:'claude',args:[]},antigravity:{executable:'agy',args:[]},codex:{executable:'codex',args:[]}},layout:'columns',sizes:[34,33,33],fontSize:14,autoInstallMissing:false}));
 const env = { ...process.env, TRINITY_TEST_USER_DATA: data }; delete env.ELECTRON_RUN_AS_NODE;
@@ -58,6 +59,16 @@ try {
   await page.getByRole('button',{name:'環境檢查',exact:true}).click(); await expect(page.locator('.detection-grid .found')).toHaveCount(3);
   await page.getByRole('button',{name:'關閉環境檢查'}).click();
   for (const id of ids) { await page.getByTestId(`pane-${id}`).getByRole('button',{name:'▶ 啟動',exact:true}).click(); await waitText(page,id,`READY:${id}:TTY=true`); }
+  for (let i=0;i<ids.length;i++) {
+    await page.getByRole('button',{name:`${labels[i]} 選擇 Skill`}).click();
+    const dialog=page.getByRole('dialog',{name:`${labels[i]} 已安裝的 Skills`});
+    const skill=dialog.getByTestId('local-skill').filter({hasText:'trinity-fixture'});
+    await expect(skill).toContainText('測試技能說明');
+    await skill.getByRole('button',{name:'插入指令'}).click();
+    await page.keyboard.press('Enter');
+    await waitText(page,ids[i],`ECHO:${ids[i]}:${ids[i]==='codex'?'$':'/'}trinity-fixture`);
+  }
+  checks.push('project skill picker displays Chinese descriptions and inserts CLI-specific references without submitting');
   await expect.poll(async()=> (await buffer(page,'codex')).replace(/\s/g,'')).toContain('ARGS:codex:["--model","fixture-model"]');
   await input(page,'codex','cwd');
   await expect.poll(async()=> (await buffer(page,'codex')).replace(/\s/g,''),{timeout:20000}).toContain(('CWD:codex:'+project).replace(/\s/g,''));

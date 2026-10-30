@@ -108,6 +108,8 @@ export function installWebDesk() {
     cancelSkillTranslation: () => call('market:cancel-translation'),
     installSkill: value => call('skill:install', value),
     skillInstallations: () => call('skill:installed'),
+    localSkills: id => call('local-skills:list', id),
+    translateLocalSkill: value => call('local-skills:translate', value),
     cancelSkillInstall: id => call('skill:cancel', id),
     onSkillInstall: listener => on('skill-install:event', listener),
     discussionState: () => call('discussion:state'),

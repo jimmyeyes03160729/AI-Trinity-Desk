@@ -13,7 +13,7 @@ import { accountPage, loginPage, setupPage } from './login-page';
 
 const version = '1.3.0';
 const env = process.env;
-const home = os.homedir();
+const home = env.TRINITY_TEST_HOME || os.homedir();
 const rawBasePath = env.TRINITY_BASE_PATH || '';
 if (rawBasePath && rawBasePath !== '/' && !/^\/(?:[A-Za-z0-9_-]+)(?:\/[A-Za-z0-9_-]+)*\/?$/.test(rawBasePath)) throw new Error('TRINITY_BASE_PATH 格式無效。');
 const basePath = rawBasePath === '/' ? '' : rawBasePath.replace(/\/$/, '');

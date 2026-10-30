@@ -66,6 +66,7 @@ export type MarketSkill={id:string;name:string;source:string;slug:string;titleZh
 export const skillEnrichSchema=z.object({ids:z.array(z.string().min(1).max(300)).min(1).max(4),provider:paneIdSchema}).strict();
 export const skillInstallSchema=z.object({id:z.string().min(1).max(300),targets:z.array(paneIdSchema).min(1).max(3).refine(ids=>new Set(ids).size===ids.length)}).strict();
 export type SkillInstallState={id:string;ai:PaneId;status:'queued'|'downloading'|'installing'|'installed'|'existing'|'error'|'cancelled';folder?:string;commit?:string;message:string};
+export type LocalSkill={ai:PaneId;scope:'user'|'legacy'|'project';folder:string;name:string;description:string;descriptionZh?:string;translationSource?:'translated'|'converted';invocable:boolean;ambiguous?:boolean};
 export type MarketResult={skills:MarketSkill[];profile?:ProjectProfile;view:MarketQuery['view'];updatedAt:string;source:string;stale:boolean;warning?:string;total:number};
 export const marketLinkSchema=z.object({id:z.string().max(300),target:z.enum(['market','source'])}).strict();
 export interface DeskApi {
@@ -93,6 +94,8 @@ export interface DeskApi {
   skillInstallations():Promise<Result<SkillInstallState[]>>;
   cancelSkillInstall(id:string):Promise<Result<null>>;
   onSkillInstall(listener:(states:SkillInstallState[])=>void):()=>void;
+  localSkills(id:PaneId):Promise<Result<LocalSkill[]>>;
+  translateLocalSkill(value:{ai:PaneId;scope:LocalSkill['scope'];folder:string}):Promise<Result<LocalSkill>>;
   installers(): Promise<Result<InstallState[]>>;
   ensureCli(): Promise<Result<InstallState[]>>;
   installCli(id: PaneId): Promise<Result<InstallState[]>>;

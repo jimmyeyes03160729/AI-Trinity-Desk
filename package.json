@@ -40,7 +40,9 @@
     "@xterm/addon-fit": "^0.11.0",
     "@xterm/xterm": "^6.0.0",
     "cheerio": "^1.0.0",
+    "js-yaml": "^5.5.0",
     "node-pty": "^1.1.0",
+    "opencc-js": "^1.4.2",
     "react": "^19.2.0",
     "react-dom": "^19.2.0",
     "ws": "^8.22.0",
@@ -50,6 +52,7 @@
   "devDependencies": {
     "@electron/rebuild": "^4.0.0",
     "@playwright/test": "^1.56.0",
+    "@types/js-yaml": "^4.0.9",
     "@types/node": "^24.0.0",
     "@types/react": "^19.2.0",
     "@types/react-dom": "^19.2.0",
@@ -72,6 +75,8 @@
       "dist/**/*",
       "dist-electron/**/*",
       "!dist-electron/install-probe.*",
+      "vendor/localization/README.md",
+      "vendor/localization/*/LICENSE",
       "package.json"
     ],
     "asar": true,
