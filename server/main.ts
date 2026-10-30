@@ -7,7 +7,7 @@ import { readFile, readdir, realpath, stat } from 'node:fs/promises';
 import { z } from 'zod';
 import { WebSocketServer, WebSocket } from 'ws';
 import { createBackend } from '../electron/backend';
-import type { Result } from '../electron/contracts';
+import { paneIdSchema, type Result } from '../electron/contracts';
 import { Auth, readCookie } from './auth';
 import { accountPage, loginPage, setupPage } from './login-page';
 
@@ -70,9 +70,10 @@ async function main() {
     return { path: folder, parent: parent !== folder && inRoots(parent) ? parent : null, roots, entries };
   });
   web.set('project:set', async value => {
-    const folder = await realpath(z.string().min(1).max(4096).parse(value)).catch(() => { throw new Error('找不到此資料夾。'); });
+    const request = z.object({ folder: z.string().min(1).max(4096), id: paneIdSchema.optional() }).strict().parse(value);
+    const folder = await realpath(request.folder).catch(() => { throw new Error('找不到此資料夾。'); });
     if (!inRoots(folder)) throw new Error('此資料夾不在允許的專案範圍內（TRINITY_PROJECT_ROOTS）。');
-    return backend.setProject(folder);
+    return backend.setProject(folder, request.id);
   });
   async function call(channel: string, value: unknown): Promise<Result<unknown>> {
     const fn = web.get(channel);

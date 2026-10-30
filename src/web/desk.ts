@@ -1,5 +1,6 @@
-import type { DeskApi, Result } from '../../electron/contracts';
+import type { DeskApi, Result, Settings } from '../../electron/contracts';
 import { pickFolder } from './FolderPicker';
+import { labels } from '../TerminalPane';
 
 // Browser implementation of the preload API. Every call is the same channel
 // the Electron preload uses, carried over one authenticated WebSocket.
@@ -84,24 +85,11 @@ export async function logout() {
 export function installWebDesk() {
   const api: DeskApi = {
     web: true,
-    cliTasks: () => call('tasks:list'),
-    createCliTask: value => call('tasks:create', value),
-    patchCliTask: value => call('tasks:patch', value),
-    selectCliTask: id => call('tasks:select', id),
-    bindCliTask: (id, nativeSessionId) => call('tasks:bind', { id, nativeSessionId }),
-    startCliTask: (taskId, cols, rows) => call('tasks:start', { taskId, cols, rows }),
-    stopCliTask: id => call('tasks:stop', id),
-    cliTaskInput: (taskId, session, data) => call('tasks:input', { taskId, session, data }),
-    cliTaskResize: (taskId, session, cols, rows) => call('tasks:resize', { taskId, session, cols, rows }),
-    // The server acknowledges output as it sends it.
-    cliTaskAck: () => {},
-    attachCliTask: taskId => call('tasks:attach', taskId),
-    onCliTasks: listener => on('tasks:event', listener),
     loadSettings: () => call('settings:load'),
     saveSettings: settings => call('settings:save', settings),
-    chooseProject: async () => {
-      const folder = await pickFolder(call);
-      return folder === null ? { ok: true, value: null } : call<string>('project:set', folder);
+    chooseProject: async id => {
+      const folder = await pickFolder(call, id ? `選擇 ${labels[id]} 的專案資料夾` : undefined);
+      return folder === null ? { ok: true, value: null } : call<Settings>('project:set', { folder, id });
     },
     detect: () => call('environment:detect'),
     providerInfo: id => call('provider:info', id),

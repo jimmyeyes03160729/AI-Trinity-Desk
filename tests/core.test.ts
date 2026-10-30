@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { mkdtemp, readFile, writeFile } from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
-import { defaultSettings, settingsSchema, inputSchema, startSchema } from '../electron/contracts';
+import { defaultSettings, settingsSchema, inputSchema, startSchema, projectFor } from '../electron/contracts';
 import { launchSpec, quotePowerShell, resolveExecutable } from '../electron/commands';
 import { SettingsStore } from '../electron/settings';
 
@@ -46,4 +46,17 @@ test('settings writes are serialized, survive reload, and corruption is preserve
   await writeFile(filename, '{invalid');
   const result = await store.load(); assert.ok(result.warning); assert.deepEqual(result.settings, defaultSettings());
   assert.equal(await readFile(filename,'utf8'),'{invalid');
+});
+
+test('old settings default to a shared folder; separate mode uses each AI folder and falls back to the shared one', () => {
+  const old = settingsSchema.parse({ version: 1, projectPath: 'D:/shared', commands: defaultSettings().commands, layout: 'columns', sizes: [34,33,33], fontSize: 14 });
+  assert.equal(old.projectMode, 'shared');
+  assert.deepEqual(old.projectPaths, { claude: '', antigravity: '', codex: '' });
+  const separate = { ...old, projectMode: 'separate' as const, projectPaths: { claude: 'D:/claude', antigravity: '', codex: 'D:/codex' } };
+  assert.equal(projectFor({ ...separate, projectMode: 'shared' }, 'claude'), 'D:/shared');
+  assert.equal(projectFor(separate, 'claude'), 'D:/claude');
+  assert.equal(projectFor(separate, 'codex'), 'D:/codex');
+  assert.equal(projectFor(separate, 'antigravity'), 'D:/shared');
+  assert.equal(settingsSchema.safeParse({ ...separate, projectMode: 'per-pane' }).success, false);
+  assert.equal(settingsSchema.safeParse({ ...separate, projectPaths: { ...separate.projectPaths, other: 'x' } }).success, false);
 });
