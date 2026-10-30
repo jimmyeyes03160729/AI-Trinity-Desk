@@ -14,6 +14,7 @@ export class Sessions {
   private shuttingDown = false;
   constructor(private spawn: SpawnPty, private emit: (event: TerminalEvent) => void, private env: NodeJS.ProcessEnv) {}
   get active() { return this.sessions.size > 0 || this.starting.size > 0; }
+  has(id: PaneId) { return this.sessions.has(id); }
   async start(id: PaneId, settings: Settings, cols: number, rows: number): Promise<SessionInfo> {
     if (this.shuttingDown) throw new Error('所有終端正在停止，請稍後再試。');
     if (this.sessions.has(id) || this.starting.has(id)) throw new Error('此欄位已啟動，請先停止或使用重新啟動。');

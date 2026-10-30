@@ -12,6 +12,7 @@ const api: DeskApi = {
   cliTaskInput:(taskId,session,data)=>ipcRenderer.invoke('tasks:input',{taskId,session,data}),
   cliTaskResize:(taskId,session,cols,rows)=>ipcRenderer.invoke('tasks:resize',{taskId,session,cols,rows}),
   cliTaskAck:(taskId,session,bytes)=>ipcRenderer.send('tasks:ack',{taskId,session,bytes}),
+  attachCliTask:taskId=>ipcRenderer.invoke('tasks:attach',taskId),
   onCliTasks:listener=>{const handler=(_:Electron.IpcRendererEvent,state:import('./contracts').CliTaskList)=>listener(state);ipcRenderer.on('tasks:event',handler);return()=>ipcRenderer.removeListener('tasks:event',handler);},
   loadSettings: () => ipcRenderer.invoke('settings:load'),
   saveSettings: settings => ipcRenderer.invoke('settings:save', settings),
@@ -51,6 +52,7 @@ const api: DeskApi = {
   input: (id, session, data) => ipcRenderer.invoke('terminal:input', { id, session, data }),
   resize: (id, session, cols, rows) => ipcRenderer.invoke('terminal:resize', { id, session, cols, rows }),
   ack: (id, session, bytes) => ipcRenderer.send('terminal:ack', { id, session, bytes }),
+  attachTerminal: id => ipcRenderer.invoke('terminal:attach', id),
   readClipboard: () => ipcRenderer.invoke('clipboard:read'),
   writeClipboard: text => ipcRenderer.invoke('clipboard:write', text),
   onTerminal: listener => {

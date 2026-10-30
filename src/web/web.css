@@ -1,0 +1,12 @@
+.folder-picker{width:620px}
+.folder-path{display:flex;gap:8px;padding:0 24px 12px}
+.folder-path input{flex:1}
+.folder-picker .pane-error{margin:0 24px 10px}
+.folder-list{margin:0 24px 14px;border:1px solid #2c3a4e;border-radius:9px;overflow:auto;height:340px;max-height:50vh;display:flex;flex-direction:column}
+.folder-item{text-align:left;background:none;border:0;border-bottom:1px solid #1d2838;border-radius:0;padding:9px 12px;color:#d6e2f3}
+.folder-item:hover,.folder-item:focus-visible{background:#1c2737}
+.folder-empty{color:#7e8da3;padding:12px;margin:0}
+.folder-roots{display:flex;flex-wrap:wrap;gap:6px;padding:0 24px 12px}
+#web-connection{position:fixed;left:50%;bottom:44px;transform:translateX(-50%);z-index:10;background:#3b2a12;color:#f3d49b;border:1px solid #7a5622;border-radius:8px;padding:8px 14px;font-size:12px;box-shadow:0 8px 30px #0008}
+.header-link{color:#b9c8dc;text-decoration:none;padding:7px 10px;border:1px solid #34435a;border-radius:7px;font-size:12px}
+.header-link:hover{border-color:#5a6d88}

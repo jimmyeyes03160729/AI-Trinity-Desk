@@ -29,6 +29,7 @@ export const inputSchema = z.object({ id: paneIdSchema, session: z.string().uuid
 export const resizeSchema = dimensionsSchema.extend({ id: paneIdSchema, session: z.string().uuid() });
 export const ackSchema = z.object({ id: paneIdSchema, session: z.string().uuid(), bytes: z.number().int().min(1).max(65536) }).strict();
 export type SessionInfo = { session: string; pid: number };
+export type TerminalAttach = SessionInfo & { history: string };
 export type TerminalEvent = { id: PaneId; session: string; taskId?:string } & (
   { type: 'data'; data: string } | { type: 'exit'; exitCode: number; signal?: number } | { type: 'error'; message: string }
 );
@@ -76,6 +77,8 @@ export type SkillInstallState={id:string;ai:PaneId;status:'queued'|'downloading'
 export type MarketResult={skills:MarketSkill[];profile?:ProjectProfile;view:MarketQuery['view'];updatedAt:string;source:string;stale:boolean;warning?:string;total:number};
 export const marketLinkSchema=z.object({id:z.string().max(300),target:z.enum(['market','source'])}).strict();
 export interface DeskApi {
+  // Set by the browser client; the desktop app leaves it undefined.
+  readonly web?: boolean;
   cliTasks():Promise<Result<CliTaskList>>;
   createCliTask(value:z.infer<typeof cliTaskCreateSchema>):Promise<Result<CliTaskList>>;
   patchCliTask(value:z.infer<typeof cliTaskPatchSchema>):Promise<Result<CliTaskList>>;
@@ -86,6 +89,7 @@ export interface DeskApi {
   cliTaskInput(taskId:string,session:string,data:string):Promise<Result<null>>;
   cliTaskResize(taskId:string,session:string,cols:number,rows:number):Promise<Result<null>>;
   cliTaskAck(taskId:string,session:string,bytes:number):void;
+  attachCliTask(taskId:string):Promise<Result<TerminalAttach|null>>;
   onCliTasks(listener:(state:CliTaskList)=>void):()=>void;
   loadSettings(): Promise<Result<{ settings: Settings; warning?: string }>>;
   saveSettings(settings: Settings): Promise<Result<Settings>>;
@@ -117,6 +121,7 @@ export interface DeskApi {
   input(id: PaneId, session: string, data: string): Promise<Result<null>>;
   resize(id: PaneId, session: string, cols: number, rows: number): Promise<Result<null>>;
   ack(id: PaneId, session: string, bytes: number): void;
+  attachTerminal(id: PaneId): Promise<Result<TerminalAttach | null>>;
   readClipboard(): Promise<Result<string>>;
   writeClipboard(text: string): Promise<Result<null>>;
   onTerminal(listener: (event: TerminalEvent) => void): () => void;

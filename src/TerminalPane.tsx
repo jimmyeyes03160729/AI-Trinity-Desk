@@ -21,6 +21,25 @@ export default function TerminalPane({ id, command, model, project, fontSize, on
   const [pid, setPid] = useState<number>();
   const [copied, setCopied] = useState(false);
   const activeCallback = useRef(onActive); activeCallback.current = onActive;
+  const attaching = useRef(false);
+  // A pane may open while its CLI already runs: after a page reload, from a
+  // second device, or when another browser started it. Show that session.
+  const attach = useRef<() => Promise<void>>(async () => {});
+  attach.current = async () => {
+    if (attaching.current || starting.current || session.current) return;
+    attaching.current = true;
+    try {
+      const result = await (taskId ? window.desk.attachCliTask(taskId) : window.desk.attachTerminal(id));
+      const terminal = term.current;
+      if (!result.ok || !result.value || !terminal || starting.current || session.current) return;
+      const value = result.value;
+      session.current = { session: value.session, pid: value.pid }; outputTail.current = value.history.slice(-16000); failure.current = undefined;
+      setPid(value.pid); setStatus('running'); setError(''); activeCallback.current(id, true);
+      terminal.reset(); terminal.write(value.history);
+      fit.current?.fit();
+      void (taskId ? window.desk.cliTaskResize(taskId, value.session, terminal.cols, terminal.rows) : window.desk.resize(id, value.session, terminal.cols, terminal.rows));
+    } finally { attaching.current = false; }
+  };
   const consume = useRef<(event: TerminalEvent) => void>(() => {});
   consume.current = event => {
     if (event.id !== id || event.session !== session.current?.session) return;
@@ -55,7 +74,9 @@ export default function TerminalPane({ id, command, model, project, fontSize, on
       const mac = /Mac/.test(navigator.platform);
       const modifier = mac ? event.metaKey : event.ctrlKey;
       if (modifier && event.key.toLowerCase() === 'c' && (mac || event.shiftKey || terminal.hasSelection())) { event.preventDefault(); void copySelection(); return false; }
-      if (modifier && event.key.toLowerCase() === 'v') { event.preventDefault(); void paste(); return false; }
+      // Browsers only grant clipboard reads to the native paste event, which
+      // the paste listener below forwards to the terminal.
+      if (modifier && event.key.toLowerCase() === 'v') { if (window.desk.web) return false; event.preventDefault(); void paste(); return false; }
       return true;
     });
     // xterm's context-menu text area uses the native paste event. Route through
@@ -68,10 +89,12 @@ export default function TerminalPane({ id, command, model, project, fontSize, on
     observer.observe(container.current!);
     window.addEventListener('resize',fitLater);
     void document.fonts.ready.then(()=>{if(alive)fitLater();});
+    void attach.current();
     const resize = terminal.onResize(({ cols, rows }) => { const current = session.current; if (current) void (taskId?window.desk.cliTaskResize(taskId,current.session,cols,rows):window.desk.resize(id, current.session, cols, rows)).then(result => { if (!result.ok && session.current === current) setError(result.error); }); });
     const off = window.desk.onTerminal(event => {
       if (event.id !== id || event.taskId !== taskId) return;
       if (starting.current && !session.current) { early.current.push(event); return; }
+      if (!session.current && event.type === 'data') { void attach.current(); return; }
       consume.current(event);
     });
     return () => { alive=false;observer.disconnect();window.removeEventListener('resize',fitLater); cancelAnimationFrame(frame); off(); input.dispose(); resize.dispose(); container.current?.removeEventListener('paste', pasteListener, true); terminal.dispose(); term.current = null; };
