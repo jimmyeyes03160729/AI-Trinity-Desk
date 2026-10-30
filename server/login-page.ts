@@ -13,7 +13,7 @@ button:disabled{opacity:.6;cursor:default}
 .hint{font-size:12px;color:#7e8da3;margin-top:6px}
 a{color:#8bbaff}`;
 type Field = { id: string; label: string; type?: string; autocomplete: string; hint?: string };
-function page(nonce: string, title: string, intro: string, fields: Field[], submit: string, endpoint: string, script = '') {
+function page(nonce: string, title: string, intro: string, fields: Field[], submit: string, endpoint: string, script = '', basePath = '') {
   const inputs = fields.map(f => `<label for="${f.id}">${f.label}</label><input id="${f.id}" name="${f.id}" type="${f.type || 'password'}" autocomplete="${f.autocomplete}" required ${f.type === 'text' ? 'autocapitalize="off" spellcheck="false"' : ''}>${f.hint ? `<div class="hint">${f.hint}</div>` : ''}`).join('');
   return `<!doctype html><html lang="zh-Hant"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="robots" content="noindex">
 <title>${title} · AI Trinity Desk</title><style nonce="${nonce}">${style}</style></head><body><main><div class="logo">△</div><h1>${title}</h1><p>${intro}</p>
@@ -26,9 +26,9 @@ form.addEventListener('submit',async event=>{
   const value=Object.fromEntries(new FormData(form));
   if(typeof check==='function'){const problem=check(value);if(problem){error.textContent=problem;return;}}
   button.disabled=true;
-  try{const response=await fetch('${endpoint}',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(value),credentials:'same-origin'});
+  try{const response=await fetch('${basePath}${endpoint}',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(value),credentials:'same-origin'});
     const result=await response.json().catch(()=>({}));
-    if(response.ok){location.replace('/');return;}
+    if(response.ok){location.replace('${basePath}/');return;}
     error.textContent=result.error||'發生錯誤，請稍後再試。';
   }catch{error.textContent='無法連線到伺服器。';}
   button.disabled=false;
@@ -36,18 +36,18 @@ form.addEventListener('submit',async event=>{
 </script></body></html>`;
 }
 const confirm = `function check(v){if(v.password!==v.confirm)return '兩次輸入的密碼不一致。';}`;
-export const setupPage = (nonce: string) => page(nonce, '建立登入帳號', '第一次使用：建立唯一的登入帳號。建立後無法再新增帳號；忘記密碼只能在主機上重設。', [
+export const setupPage = (nonce: string, basePath = '') => page(nonce, '建立登入帳號', '第一次使用：建立唯一的登入帳號。建立後無法再新增帳號；忘記密碼只能在主機上重設。', [
   { id: 'code', label: '設定碼', type: 'text', autocomplete: 'off', hint: '伺服器第一次啟動時顯示在 Mac mini 的終端機，也保存在資料目錄的 setup-code.txt。' },
   { id: 'username', label: '帳號', type: 'text', autocomplete: 'username', hint: '3–32 個英數字、點、底線或連字號。' },
   { id: 'password', label: '密碼', autocomplete: 'new-password', hint: '至少 12 個字元，不可包含帳號。建議用密碼管理器產生。' },
   { id: 'confirm', label: '再次輸入密碼', autocomplete: 'new-password' }
-], '建立帳號並登入', '/api/setup', confirm);
-export const loginPage = (nonce: string) => page(nonce, '登入 AI Trinity Desk', '登入後可從這台瀏覽器操作主機上的 Claude Code、Codex 與 Antigravity。', [
+], '建立帳號並登入', '/api/setup', confirm, basePath);
+export const loginPage = (nonce: string, basePath = '') => page(nonce, '登入 AI Trinity Desk', '登入後可從這台瀏覽器操作主機上的 Claude Code、Codex 與 Antigravity。', [
   { id: 'username', label: '帳號', type: 'text', autocomplete: 'username' },
   { id: 'password', label: '密碼', autocomplete: 'current-password' }
-], '登入', '/api/login');
-export const accountPage = (nonce: string, username: string) => page(nonce, '變更密碼', `帳號：${username.replace(/[^A-Za-z0-9._-]/g, '')}。變更後其他裝置會全部登出。<a href="/">返回工作台</a>`, [
+], '登入', '/api/login', '', basePath);
+export const accountPage = (nonce: string, username: string, basePath = '') => page(nonce, '變更密碼', `帳號：${username.replace(/[^A-Za-z0-9._-]/g, '')}。變更後其他裝置會全部登出。<a href="${basePath}/">返回工作台</a>`, [
   { id: 'current', label: '目前密碼', autocomplete: 'current-password' },
   { id: 'password', label: '新密碼', autocomplete: 'new-password', hint: '至少 12 個字元，不可包含帳號。' },
   { id: 'confirm', label: '再次輸入新密碼', autocomplete: 'new-password' }
-], '變更密碼', '/api/password', confirm);
+], '變更密碼', '/api/password', confirm, basePath);

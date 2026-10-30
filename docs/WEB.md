@@ -64,6 +64,18 @@ npm run web:reset-account
 
 伺服器預設只監聽 `127.0.0.1`，不會直接暴露在網路上。跨網路請透過下面任一種加密通道，**不要在路由器開 port 轉發未加密的 HTTP**。
 
+### 使用現有網站的 `/desk/` 路徑
+
+可設定 `TRINITY_BASE_PATH=/desk`，讓登入、API、終端 WebSocket 和 Cookie 都使用 `/desk/` 路徑。未設定時仍使用根目錄。本機測試：
+
+```bash
+TRINITY_BASE_PATH=/desk npm run web:start
+```
+
+開啟 `http://127.0.0.1:8765/desk/`。macOS 常駐服務安裝時同樣需要設定 `TRINITY_BASE_PATH=/desk`；環境變數在安裝時寫入設定，修改後須重新執行 install。
+
+例如 `https://jimmyeyes.com/desk/`：需要在現有網站的 Cloudflare 路由中，將 `/desk` 和 `/desk/*`（包括 WebSocket）導向 Mac mini 的服務，其他路徑維持原有來源。路由須保留 `/desk` 前綴；Cloudflare Tunnel 本身不會移除路徑。現有網域已有網站，不能只把其 DNS 改到 Tunnel，應先確認現有設定及路由方案，並測試 HTTPS、登入、WebSocket、重連及其他網站路徑。專案目前沒有自動建立這些 Cloudflare 設定。
+
 ### 方案 A：Tailscale（推薦，只有你的裝置能連）
 
 1. 在 Mac mini 和要連線的電腦都安裝 [Tailscale](https://tailscale.com/download)，並登入同一個帳號。
@@ -125,6 +137,7 @@ scripts/macos-web-service.sh logs
 | --- | --- | --- |
 | `TRINITY_WEB_HOST` | `127.0.0.1` | 監聽位址。使用 Tailscale 或 Cloudflare 時維持預設 |
 | `TRINITY_WEB_PORT` | `8765` | 連接埠 |
+| `TRINITY_BASE_PATH` | 空 | 網頁路徑前綴，例如 `/desk`；根目錄保留空值 |
 | `TRINITY_ALLOWED_ORIGINS` | 空 | 允許的網址來源，例如 `https://desk.example.com`，多個用逗號分隔 |
 | `TRINITY_TRUST_PROXY` | 關 | 設 `1` 時讀取 `X-Forwarded-*`／`CF-Connecting-IP` |
 | `TRINITY_PROJECT_ROOTS` | 家目錄 | 可選為專案的資料夾範圍 |

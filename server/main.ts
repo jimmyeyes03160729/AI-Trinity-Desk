@@ -14,6 +14,10 @@ import { accountPage, loginPage, setupPage } from './login-page';
 const version = '1.3.0';
 const env = process.env;
 const home = os.homedir();
+const rawBasePath = env.TRINITY_BASE_PATH || '';
+if (rawBasePath && rawBasePath !== '/' && !/^\/(?:[A-Za-z0-9_-]+)(?:\/[A-Za-z0-9_-]+)*\/?$/.test(rawBasePath)) throw new Error('TRINITY_BASE_PATH 格式無效。');
+const basePath = rawBasePath === '/' ? '' : rawBasePath.replace(/\/$/, '');
+const appPath = (pathname: string) => basePath + pathname;
 function defaultDataDir() {
   if (process.platform === 'darwin') return path.join(home, 'Library', 'Application Support', 'AI Trinity Desk Web');
   if (process.platform === 'win32') return path.join(env.APPDATA || path.join(home, 'AppData', 'Roaming'), 'AI Trinity Desk Web');
@@ -108,7 +112,7 @@ async function main() {
   const types: Record<string, string> = { '.js': 'text/javascript; charset=utf-8', '.css': 'text/css; charset=utf-8', '.html': 'text/html; charset=utf-8', '.svg': 'image/svg+xml', '.png': 'image/png', '.ico': 'image/x-icon', '.woff2': 'font/woff2', '.json': 'application/json', '.map': 'application/json' };
   async function serveApp(req: http.IncomingMessage, res: http.ServerResponse, pathname: string) {
     if (pathname === '/' || pathname === '/index.html') {
-      const html = (await readFile(path.join(config.distDir, 'index.html'), 'utf8')).replace(/<meta http-equiv="Content-Security-Policy"[^>]*>/i, '');
+      const html = (await readFile(path.join(config.distDir, 'index.html'), 'utf8')).replace(/<meta http-equiv="Content-Security-Policy"[^>]*>/i, '').replace('</head>', `<meta name="trinity-base-path" content="${basePath}"></head>`);
       const host = hostOf(req).replace(/[^A-Za-z0-9.:\-[\]]/g, '');
       const csp = `default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; font-src 'self'; connect-src 'self' ws://${host} wss://${host}; object-src 'none'; base-uri 'none'; form-action 'none'; frame-ancestors 'none'; frame-src 'none'`;
       send(res, 200, html, { 'Content-Type': 'text/html; charset=utf-8', 'Content-Security-Policy': csp }); return;
@@ -121,17 +125,20 @@ async function main() {
   }
   async function route(req: http.IncomingMessage, res: http.ServerResponse) {
     const url = new URL(req.url || '/', 'http://localhost');
-    const pages: Record<string, () => string> = { '/setup': () => setupPage(nonce), '/login': () => loginPage(nonce), '/account': () => accountPage(nonce, auth.username || '') };
+    if (basePath && url.pathname === basePath) { send(res, 308, '', { Location: basePath + '/' + url.search }); return; }
+    if (basePath && !url.pathname.startsWith(basePath + '/')) { send(res, 404, 'Not found'); return; }
+    if (basePath) url.pathname = url.pathname.slice(basePath.length);
+    const pages: Record<string, () => string> = { '/setup': () => setupPage(nonce, basePath), '/login': () => loginPage(nonce, basePath), '/account': () => accountPage(nonce, auth.username || '', basePath) };
     const nonce = randomBytes(16).toString('base64');
     if (pages[url.pathname] && req.method === 'GET') {
       // Exactly one of setup or login is reachable, depending on whether the
       // account exists; the account page needs a signed-in session.
       const target = !auth.configured ? '/setup' : url.pathname === '/account' ? (authorized(req) ? '/account' : '/login') : authorized(req) ? '/' : '/login';
-      if (target !== url.pathname) { send(res, 302, '', { Location: target }); return; }
+      if (target !== url.pathname) { send(res, 302, '', { Location: appPath(target) }); return; }
       send(res, 200, pages[url.pathname](), { 'Content-Type': 'text/html; charset=utf-8', 'Content-Security-Policy': `default-src 'none'; script-src 'nonce-${nonce}'; style-src 'nonce-${nonce}'; connect-src 'self'; base-uri 'none'; form-action 'none'; frame-ancestors 'none'` });
       return;
     }
-    const cookie = (session: { token: string; maxAge: number }) => ({ 'Set-Cookie': `${cookieName}=${session.token}; Path=/; HttpOnly; SameSite=Strict; Max-Age=${session.maxAge}${secure(req) ? '; Secure' : ''}` });
+    const cookie = (session: { token: string; maxAge: number }) => ({ 'Set-Cookie': `${cookieName}=${session.token}; Path=${appPath('/')}; HttpOnly; SameSite=Strict; Max-Age=${session.maxAge}${secure(req) ? '; Secure' : ''}` });
     const credentials = { '/api/setup': true, '/api/login': true, '/api/password': true } as Record<string, boolean>;
     if (credentials[url.pathname] && req.method === 'POST') {
       if (!sameOrigin(req)) { json(res, 403, { error: '拒絕跨站請求。' }); return; }
@@ -161,13 +168,13 @@ async function main() {
       const token = readCookie(req.headers.cookie, cookieName);
       await auth.logout(token);
       for (const socket of clients) if (socket.token === token) socket.close(4001, 'logged out');
-      json(res, 200, { ok: true }, { 'Set-Cookie': `${cookieName}=; Path=/; HttpOnly; SameSite=Strict; Max-Age=0` });
+      json(res, 200, { ok: true }, { 'Set-Cookie': `${cookieName}=; Path=${appPath('/')}; HttpOnly; SameSite=Strict; Max-Age=0` });
       return;
     }
     if (url.pathname === '/api/session') { json(res, authorized(req) ? 200 : 401, { ok: authorized(req) }); return; }
     if (req.method !== 'GET' && req.method !== 'HEAD') { send(res, 405, 'Method not allowed'); return; }
     if (!authorized(req)) {
-      if (url.pathname === '/' || url.pathname === '/index.html') send(res, 302, '', { Location: auth.configured ? '/login' : '/setup' });
+      if (url.pathname === '/' || url.pathname === '/index.html') send(res, 302, '', { Location: appPath(auth.configured ? '/login' : '/setup') });
       else send(res, 401, 'Unauthorized', { 'Content-Type': 'text/plain' });
       return;
     }
@@ -181,8 +188,8 @@ async function main() {
   const sockets = new WebSocketServer({ noServer: true, maxPayload: 2 * 1024 * 1024 });
   server.on('upgrade', (req, socket, head) => {
     const url = new URL(req.url || '/', 'http://localhost');
-    if (url.pathname !== '/ws' || !authorized(req) || !sameOrigin(req)) {
-      if (url.pathname === '/ws' && authorized(req)) console.warn(`拒絕來源 ${req.headers.origin} 的 WebSocket；若使用反向代理，請設定 TRINITY_TRUST_PROXY=1 或 TRINITY_ALLOWED_ORIGINS。`);
+    if (url.pathname !== appPath('/ws') || !authorized(req) || !sameOrigin(req)) {
+      if (url.pathname === appPath('/ws') && authorized(req)) console.warn(`拒絕來源 ${req.headers.origin} 的 WebSocket；若使用反向代理，請設定 TRINITY_TRUST_PROXY=1 或 TRINITY_ALLOWED_ORIGINS。`);
       socket.write('HTTP/1.1 401 Unauthorized\r\nConnection: close\r\n\r\n'); socket.destroy(); return;
     }
     sockets.handleUpgrade(req, socket, head, ws => {
@@ -213,7 +220,7 @@ async function main() {
   await new Promise<void>((resolve, reject) => { server.once('error', reject); server.listen(config.port, config.host, () => resolve()); });
   const scheme = config.tlsCert ? 'https' : 'http';
   console.log(`AI Trinity Desk Web ${version}`);
-  console.log(`  網址：${scheme}://${config.host === '0.0.0.0' ? os.hostname() : config.host}:${config.port}/`);
+  console.log(`  網址：${scheme}://${config.host === '0.0.0.0' ? os.hostname() : config.host}:${config.port}${appPath('/')}`);
   console.log(`  資料目錄：${config.dataDir}`);
   console.log(`  可選專案範圍：${roots.join(', ')}`);
   if (setupCode) console.log(`\n  尚未建立登入帳號。請用瀏覽器開啟網址，輸入以下設定碼並建立唯一的帳號密碼：\n\n      ${setupCode}\n\n  （設定碼也保存在 ${auth.codeFile}，建立帳號後自動刪除）\n`);

@@ -21,6 +21,16 @@ jobs:
           cache: npm
       - run: npm ci
       - run: npm test
+      - run: npm run web:build
+      - name: Test web at root and under /desk
+        shell: pwsh
+        run: |
+          $env:TRINITY_CHROMIUM = 'C:\Program Files\Google\Chrome\Application\chrome.exe'
+          npm run test:web
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          $env:TRINITY_TEST_BASE_PATH = '/desk'
+          npm run test:web
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
       - run: npm run test:e2e
         timeout-minutes: 5
       - run: npm run dist:win -- --publish never

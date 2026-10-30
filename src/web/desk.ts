@@ -12,6 +12,7 @@ let socket: WebSocket | undefined;
 let next = 1;
 let opened = false;
 let retry = 0;
+export const webPath = (pathname: string) => (document.querySelector<HTMLMetaElement>('meta[name="trinity-base-path"]')?.content || '') + pathname;
 
 function banner(text: string | undefined) {
   let element = document.getElementById('web-connection');
@@ -20,7 +21,7 @@ function banner(text: string | undefined) {
   element.textContent = text;
 }
 function connect() {
-  const ws = new WebSocket((location.protocol === 'https:' ? 'wss://' : 'ws://') + location.host + '/ws');
+  const ws = new WebSocket((location.protocol === 'https:' ? 'wss://' : 'ws://') + location.host + webPath('/ws'));
   socket = ws;
   ws.onopen = () => {
     // State may have changed while offline; reload so every panel reads the
@@ -38,9 +39,9 @@ function connect() {
   ws.onclose = event => {
     for (const resolve of pending.values()) resolve({ ok: false, error: '與主機的連線中斷，請稍後再試。' });
     pending.clear();
-    if (event.code === 4001) { location.replace('/login'); return; }
-    void fetch('/api/session', { credentials: 'same-origin' }).then(response => {
-      if (response.status === 401) { location.replace('/login'); return; }
+    if (event.code === 4001) { location.replace(webPath('/login')); return; }
+    void fetch(webPath('/api/session'), { credentials: 'same-origin' }).then(response => {
+      if (response.status === 401) { location.replace(webPath('/login')); return; }
       banner('與主機的連線中斷，正在重新連線…');
       setTimeout(connect, Math.min(15000, 1000 * 2 ** retry++));
     }, () => { banner('無法連線到主機，正在重試…'); setTimeout(connect, Math.min(15000, 1000 * 2 ** retry++)); });
@@ -78,8 +79,8 @@ async function readClipboard(): Promise<Result<string>> {
   }
 }
 export async function logout() {
-  await fetch('/api/logout', { method: 'POST', credentials: 'same-origin' }).catch(() => {});
-  location.replace('/login');
+  await fetch(webPath('/api/logout'), { method: 'POST', credentials: 'same-origin' }).catch(() => {});
+  location.replace(webPath('/login'));
 }
 
 export function installWebDesk() {

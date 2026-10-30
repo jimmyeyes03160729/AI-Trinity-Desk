@@ -5,6 +5,7 @@ import fs from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
 import { chromium } from 'playwright';
+import WebSocket from 'ws';
 
 const root = await fs.mkdtemp(path.join(os.tmpdir(), 'trinity-web-'));
 const data = path.join(root, 'data'), project = path.join(root, 'project');
@@ -12,9 +13,11 @@ await fs.mkdir(data, { recursive: true }); await fs.mkdir(project);
 const fixture = path.resolve('tests/fixture.cjs');
 const command = tag => ({ executable: process.execPath, args: [fixture, tag] });
 await fs.writeFile(path.join(data, 'settings.json'), JSON.stringify({ version: 1, projectPath: '', commands: { claude: command('claude'), antigravity: command('agy'), codex: command('codex') }, layout: 'columns', sizes: [34, 33, 33], fontSize: 14, autoInstallMissing: false }));
-const port = 18000 + Math.floor(Math.random() * 1000), base = `http://127.0.0.1:${port}`;
+const port = 18000 + Math.floor(Math.random() * 1000), origin = `http://127.0.0.1:${port}`;
+const prefix = process.env.TRINITY_TEST_BASE_PATH || '';
+const base = origin + prefix;
 let log = '';
-const server = spawn(process.execPath, ['dist-server/server.cjs'], { env: { ...process.env, TRINITY_DATA_DIR: data, TRINITY_WEB_PORT: String(port), TRINITY_PROJECT_ROOTS: root }, stdio: ['ignore', 'pipe', 'pipe'] });
+const server = spawn(process.execPath, ['dist-server/server.cjs'], { env: { ...process.env, TRINITY_DATA_DIR: data, TRINITY_WEB_PORT: String(port), TRINITY_PROJECT_ROOTS: root, TRINITY_BASE_PATH: prefix }, stdio: ['ignore', 'pipe', 'pipe'] });
 server.stdout.on('data', d => { log += d; }); server.stderr.on('data', d => { log += d; });
 const until = async (fn, ms = 10000) => { const end = Date.now() + ms; for (;;) { const v = await fn(); if (v) return v; if (Date.now() > end) throw new Error('timeout'); await new Promise(r => setTimeout(r, 100)); } };
 const expect = (ok, label) => { if (!ok) throw new Error('FAILED: ' + label + '\n' + log); console.log('ok -', label); };
@@ -22,7 +25,11 @@ const browser = await chromium.launch(process.env.TRINITY_CHROMIUM ? { executabl
 try {
   const code = await until(() => log.match(/\b([A-Z2-9]{4}-[A-Z2-9]{4}-[A-Z2-9]{4})\b/)?.[1]);
   expect((await fs.readFile(path.join(data, 'setup-code.txt'), 'utf8')).trim() === code, 'setup code printed and saved');
-  expect((await fetch(base + '/', { redirect: 'manual' })).headers.get('location') === '/setup', 'unconfigured root redirects to setup');
+  if (prefix) {
+    expect((await fetch(base, { redirect: 'manual' })).headers.get('location') === prefix + '/', 'base path redirects to trailing slash');
+    expect((await fetch(origin + '/api/session')).status === 404, 'outside base path is rejected');
+  }
+  expect((await fetch(base + '/', { redirect: 'manual' })).headers.get('location') === prefix + '/setup', 'unconfigured root redirects to setup');
   const page = await browser.newPage();
   await page.goto(base + '/');
   expect(page.url().endsWith('/setup'), 'browser lands on setup page');
@@ -38,18 +45,19 @@ try {
   expect(!(await fs.stat(path.join(data, 'setup-code.txt')).catch(() => null)), 'setup code removed after account creation');
   const stored = await fs.readFile(path.join(data, 'web-auth.json'), 'utf8');
   expect(!stored.includes('correct horse') && /"hash"/.test(stored), 'password stored only as hash');
-  expect(((await fs.stat(path.join(data, 'web-auth.json'))).mode & 0o077) === 0, 'auth file is private (0600)');
-  const second = await fetch(base + '/api/setup', { method: 'POST', headers: { 'Content-Type': 'application/json', Origin: base }, body: JSON.stringify({ code, username: 'evil', password: 'another long password' }) });
+  if (process.platform !== 'win32') expect(((await fs.stat(path.join(data, 'web-auth.json'))).mode & 0o077) === 0, 'auth file is private (0600)');
+  const second = await fetch(base + '/api/setup', { method: 'POST', headers: { 'Content-Type': 'application/json', Origin: origin }, body: JSON.stringify({ code, username: 'evil', password: 'another long password' }) });
   expect(second.status === 400 && /已建立/.test((await second.json()).error), 'second account cannot be created');
-  expect((await fetch(base + '/setup', { redirect: 'manual' })).headers.get('location') === '/login', 'setup page closed after account exists');
+  expect((await fetch(base + '/setup', { redirect: 'manual' })).headers.get('location') === prefix + '/login', 'setup page closed after account exists');
   const cross = await fetch(base + '/api/login', { method: 'POST', headers: { 'Content-Type': 'application/json', Origin: 'https://evil.example' }, body: JSON.stringify({ username: 'owner', password: 'correct horse battery' }) });
   expect(cross.status === 403, 'cross-origin login rejected');
-  const wrong = await fetch(base + '/api/login', { method: 'POST', headers: { 'Content-Type': 'application/json', Origin: base }, body: JSON.stringify({ username: 'owner', password: 'wrong password!!' }) });
+  const wrong = await fetch(base + '/api/login', { method: 'POST', headers: { 'Content-Type': 'application/json', Origin: origin }, body: JSON.stringify({ username: 'owner', password: 'wrong password!!' }) });
   expect(wrong.status === 401 && (await wrong.json()).error === '帳號或密碼錯誤。', 'wrong password gets generic error');
   expect((await fetch(base + '/assets/x.js')).status === 401, 'app assets require login');
   const cookie = (await page.context().cookies()).find(c => c.name === 'trinity_session');
   expect(cookie?.httpOnly && cookie.sameSite === 'Strict', 'session cookie is HttpOnly + SameSite=Strict');
-  const hijack = await new Promise(resolve => { const ws = new WebSocket(`ws://127.0.0.1:${port}/ws`, { headers: { Cookie: `trinity_session=${cookie.value}`, Origin: 'https://evil.example' } }); ws.onopen = () => resolve('open'); ws.onerror = () => resolve('rejected'); });
+  expect(cookie.path === (prefix || '') + '/', 'session cookie scoped to application path');
+  const hijack = await new Promise(resolve => { const ws = new WebSocket(`ws://127.0.0.1:${port}${prefix}/ws`, { headers: { Cookie: `trinity_session=${cookie.value}`, Origin: 'https://evil.example' } }); ws.on('open', () => resolve('open')); ws.on('error', () => resolve('rejected')); });
   expect(hijack === 'rejected', 'cross-site WebSocket rejected even with cookie');
 
   // Project picker browses the host.
@@ -57,9 +65,9 @@ try {
   await page.waitForSelector('.folder-picker');
   await page.click('.folder-item:has-text("project")');
   await page.click('text=使用此資料夾');
-  await page.waitForSelector(`strong[title="${project}"]`);
+  await page.locator('strong').filter({ hasText: project }).waitFor();
   expect(true, 'project chosen through folder picker');
-  const outside = await page.evaluate(() => new Promise(r => { const ws = new WebSocket('ws://' + location.host + '/ws'); ws.onopen = () => ws.send(JSON.stringify({ t: 'call', id: 1, ch: 'fs:list', v: '/' })); ws.onmessage = e => r(JSON.parse(e.data).r); }));
+  const outside = await page.evaluate(({ prefix, outsidePath }) => new Promise(r => { const ws = new WebSocket('ws://' + location.host + prefix + '/ws'); ws.onopen = () => ws.send(JSON.stringify({ t: 'call', id: 1, ch: 'fs:list', v: outsidePath })); ws.onmessage = e => { r(JSON.parse(e.data).r); ws.close(); }; }), { prefix, outsidePath: path.parse(root).root });
   expect(!outside.ok, 'folders outside project roots are refused');
 
   // Terminal round trip.

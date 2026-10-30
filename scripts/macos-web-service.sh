@@ -18,7 +18,7 @@ case "${1:-}" in
     [ -f "$ROOT/dist-server/server.cjs" ] || { echo "請先執行 npm run web:build。"; exit 1; }
     mkdir -p "$HOME/Library/LaunchAgents" "$LOGS"
     VARS=""
-    for name in TRINITY_WEB_HOST TRINITY_WEB_PORT TRINITY_DATA_DIR TRINITY_PROJECT_ROOTS TRINITY_ALLOWED_ORIGINS TRINITY_TRUST_PROXY TRINITY_TLS_CERT TRINITY_TLS_KEY; do
+    for name in TRINITY_WEB_HOST TRINITY_WEB_PORT TRINITY_BASE_PATH TRINITY_DATA_DIR TRINITY_PROJECT_ROOTS TRINITY_ALLOWED_ORIGINS TRINITY_TRUST_PROXY TRINITY_TLS_CERT TRINITY_TLS_KEY; do
       if [ -n "${!name:-}" ]; then VARS="$VARS<key>$name</key><string>$(escape "${!name}")</string>"; fi
     done
     cat > "$PLIST" <<EOF
