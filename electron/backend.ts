@@ -14,7 +14,7 @@ import {SkillMarket} from './skill-market';
 import {SkillSummaries} from './skill-summary';
 import {SkillInstaller,skillRoots} from './skill-install';
 import { resolveExecutable, terminalEnvironment } from './commands';
-import { ackSchema, inputSchema, paneIds, paneIdSchema, resizeSchema, settingsSchema, startSchema, discussionSchema, continueDiscussionSchema, skillEnrichSchema, type DiscussionState, type PaneId, type Result, type Settings, type TerminalEvent, type TerminalAttach } from './contracts';
+import { ackSchema, inputSchema, paneIds, paneIdSchema, projectFor, resizeSchema, settingsSchema, startSchema, discussionSchema, continueDiscussionSchema, skillEnrichSchema, type DiscussionState, type PaneId, type Result, type Settings, type TerminalEvent, type TerminalAttach } from './contracts';
 
 // Everything except the window, dialogs and OS integrations lives here so the
 // Electron app and the web server expose exactly the same channels.
@@ -116,14 +116,24 @@ export async function createBackend(host: BackendHost) {
   const handlers = new Map<string, Handler>();
   const notifications = new Map<string, (value: unknown) => void>();
   const handle = (channel: string, fn: Handler) => handlers.set(channel, fn);
+  // Project changes and terminal starts must be ordered across all clients.
+  let projectQueue: Promise<unknown> = Promise.resolve();
+  function serialized<T>(work: () => Promise<T>): Promise<T> {
+    const task = projectQueue.catch(() => {}).then(work);
+    projectQueue = task;
+    return task;
+  }
   handle('settings:load', () => ({ settings, warning: [loaded.warning, nativeError].filter(Boolean).join('\n') || undefined }));
-  handle('settings:save', async value => {
+  handle('settings:save', value => serialized(async () => {
     const next = settingsSchema.parse(value);
     if (next.projectPath !== settings.projectPath || JSON.stringify(next.projectPaths) !== JSON.stringify(settings.projectPaths)) throw new Error('專案路徑只能透過「選擇專案」變更。');
     if (next.projectMode !== settings.projectMode) checkProjectChange();
     if (installers.active && JSON.stringify(next.commands) !== JSON.stringify(settings.commands)) throw new Error('請先完成或取消 CLI 安裝，再變更啟動命令。');
-    settings = await store.save(next); return settings;
-  });
+    const modeChanged = next.projectMode !== settings.projectMode;
+    settings = await store.save(next);
+    if (modeChanged) host.emit('project:event', settings);
+    return settings;
+  }));
   handle('environment:detect', async () => ({
     platform: process.platform, arch: process.arch, node: process.versions.node, electron: host.runtime,
     shell: process.platform === 'win32' ? 'Windows ConPTY / PowerShell shim' : (env.SHELL || '/bin/zsh'),
@@ -160,14 +170,16 @@ export async function createBackend(host: BackendHost) {
   handle('installers:ensure', () => settings.autoInstallMissing ? installers.request(paneIds) : installers.snapshot);
   handle('installers:install', value => installers.request([paneIdSchema.parse(value)]));
   handle('installers:cancel', async value => { await installers.cancel(paneIdSchema.parse(value)); return null; });
-  handle('terminal:start', async value => {
+  handle('terminal:start', value => serialized(async () => {
     const v = startSchema.parse(value);
+    if (host.autoAck && v.expectedProject === undefined) throw new Error('請重新整理頁面後再啟動終端。');
+    if (v.expectedProject !== undefined && v.expectedProject !== projectFor(settings, v.id)) throw new Error('專案已在其他裝置變更，請確認目前顯示的專案後再啟動。');
     const state = installers.snapshot.find(s=>s.id===v.id)!;
     if (['queued','checking','downloading','installing'].includes(state.status)) throw new Error('CLI 正在安裝，請完成後再啟動。');
     const info = await native().start(v.id, settings, v.cols, v.rows);
     history.started(v.id, info.session, info.pid);
     return info;
-  });
+  }));
   handle('terminal:stop', async value => { await native().stop(paneIdSchema.parse(value)); return null; });
   handle('terminal:input', value => { const v = inputSchema.parse(value); native().write(v.id, v.session, v.data); return null; });
   handle('terminal:resize', value => { const v = resizeSchema.parse(value); native().resize(v.id, v.session, v.cols, v.rows); return null; });
@@ -184,12 +196,13 @@ export async function createBackend(host: BackendHost) {
     get settings() { return settings; },
     checkProjectChange,
     // Only the project picker may change the working folders.
-    async setProject(folder: string, id?: PaneId) {
+    setProject(folder: string, id?: PaneId) { return serialized(async () => {
       checkProjectChange(id);
       if (!path.isAbsolute(folder) || !(await stat(folder).catch(() => undefined))?.isDirectory()) throw new Error('請選擇存在的資料夾。');
       settings = await store.save(id ? { ...settings, projectPaths: { ...settings.projectPaths, [id]: folder } } : { ...settings, projectPath: folder });
+      host.emit('project:event', settings);
       return settings;
-    },
+    }); },
     get busy() { return !!sessions?.active||installers.active||discussions.active||skillInstaller.active||skillSummaries.active; },
     flush: () => discussions.flush(),
     shutdown: () => Promise.all([sessions?.stopAll(),installers.shutdown(),discussions.stop(),skillInstaller.shutdown(),skillSummaries.shutdown()]),

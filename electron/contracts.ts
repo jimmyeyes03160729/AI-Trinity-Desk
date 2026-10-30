@@ -26,7 +26,7 @@ export const defaultSettings = (): Settings => ({ version: 1, projectPath: '', c
   claude: { executable: 'claude', args: [] }, antigravity: { executable: 'agy', args: [] }, codex: { executable: 'codex', args: [] }
 }, layout: 'columns', sizes: [34,33,33], fontSize: 14, autoInstallMissing: true,visiblePanes:[...paneIds],models:{claude:'',antigravity:'',codex:''},projectMode:'shared',projectPaths:{claude:'',antigravity:'',codex:''} });
 export const dimensionsSchema = z.object({ cols: z.number().int().min(2).max(1000), rows: z.number().int().min(1).max(500) }).strict();
-export const startSchema = dimensionsSchema.extend({ id: paneIdSchema });
+export const startSchema = dimensionsSchema.extend({ id: paneIdSchema, expectedProject: z.string().max(4096).optional() });
 export const inputSchema = z.object({ id: paneIdSchema, session: z.string().uuid(), data: z.string().max(65536) }).strict();
 export const resizeSchema = dimensionsSchema.extend({ id: paneIdSchema, session: z.string().uuid() });
 export const ackSchema = z.object({ id: paneIdSchema, session: z.string().uuid(), bytes: z.number().int().min(1).max(65536) }).strict();
@@ -73,6 +73,7 @@ export interface DeskApi {
   readonly web?: boolean;
   loadSettings(): Promise<Result<{ settings: Settings; warning?: string }>>;
   saveSettings(settings: Settings): Promise<Result<Settings>>;
+  onProjectChange?(listener: (settings: Settings) => void): () => void;
   // Without a pane the shared folder changes; with one, only that AI's folder.
   chooseProject(id?: PaneId): Promise<Result<Settings | null>>;
   detect(): Promise<Result<Environment>>;
@@ -97,7 +98,7 @@ export interface DeskApi {
   installCli(id: PaneId): Promise<Result<InstallState[]>>;
   cancelInstall(id: PaneId): Promise<Result<null>>;
   onInstall(listener: (states: InstallState[]) => void): () => void;
-  start(id: PaneId, cols: number, rows: number): Promise<Result<SessionInfo>>;
+  start(id: PaneId, cols: number, rows: number, expectedProject?: string): Promise<Result<SessionInfo>>;
   stop(id: PaneId): Promise<Result<null>>;
   input(id: PaneId, session: string, data: string): Promise<Result<null>>;
   resize(id: PaneId, session: string, cols: number, rows: number): Promise<Result<null>>;

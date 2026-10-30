@@ -118,7 +118,7 @@ export default function TerminalPane({ id, command, model, project, fontSize, on
     starting.current = true; early.current = [];outputTail.current='';failure.current=undefined; setError(''); setStatus('starting'); activeCallback.current(id, true);
     fit.current?.fit(); term.current?.reset();
     const terminal = term.current;
-    const result = await window.desk.start(id, terminal?.cols || 80, terminal?.rows || 24);
+    const result = await window.desk.start(id, terminal?.cols || 80, terminal?.rows || 24, project);
     if (result.ok) { session.current = result.value; setPid(result.value.pid); setStatus('running');if(terminal)void window.desk.resize(id,result.value.session,terminal.cols,terminal.rows); }
     else { setError(result.error); setStatus('error'); activeCallback.current(id, false); }
     starting.current = false;

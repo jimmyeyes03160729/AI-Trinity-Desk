@@ -88,6 +88,7 @@ export function installWebDesk() {
     web: true,
     loadSettings: () => call('settings:load'),
     saveSettings: settings => call('settings:save', settings),
+    onProjectChange: listener => on('project:event', listener),
     chooseProject: async id => {
       const folder = await pickFolder(call, id ? `選擇 ${labels[id]} 的專案資料夾` : undefined);
       return folder === null ? { ok: true, value: null } : call<Settings>('project:set', { folder, id });
@@ -121,7 +122,7 @@ export function installWebDesk() {
     installCli: id => call('installers:install', id),
     cancelInstall: id => call('installers:cancel', id),
     onInstall: listener => on('installers:event', listener),
-    start: (id, cols, rows) => call('terminal:start', { id, cols, rows }),
+    start: (id, cols, rows, expectedProject) => call('terminal:start', { id, cols, rows, expectedProject }),
     stop: id => call('terminal:stop', id),
     input: (id, session, data) => call('terminal:input', { id, session, data }),
     resize: (id, session, cols, rows) => call('terminal:resize', { id, session, cols, rows }),

@@ -7,9 +7,9 @@ import path from 'node:path';
 import { chromium } from 'playwright';
 import WebSocket from 'ws';
 
-const root = await fs.mkdtemp(path.join(os.tmpdir(), 'trinity-web-'));
-const data = path.join(root, 'data'), project = path.join(root, 'project');
-await fs.mkdir(data, { recursive: true }); await fs.mkdir(project);
+const root = await fs.realpath(await fs.mkdtemp(path.join(os.tmpdir(), 'trinity-web-')));
+const data = path.join(root, 'data'), project = path.join(root, 'project'), project2 = path.join(root, 'project-two');
+await fs.mkdir(data, { recursive: true }); await fs.mkdir(project); await fs.mkdir(project2);
 const fixture = path.resolve('tests/fixture.cjs');
 const command = tag => ({ executable: process.execPath, args: [fixture, tag] });
 await fs.writeFile(path.join(data, 'settings.json'), JSON.stringify({ version: 1, projectPath: '', commands: { claude: command('claude'), antigravity: command('agy'), codex: command('codex') }, layout: 'columns', sizes: [34, 33, 33], fontSize: 14, autoInstallMissing: false }));
@@ -63,7 +63,7 @@ try {
   // Project picker browses the host.
   await page.click('text=選擇專案…');
   await page.waitForSelector('.folder-picker');
-  await page.click('.folder-item:has-text("project")');
+  await page.getByRole('button', { name: '▱ project', exact: true }).click();
   await page.click('text=使用此資料夾');
   await page.locator('strong').filter({ hasText: project }).waitFor();
   expect(true, 'project chosen through folder picker');
@@ -105,6 +105,36 @@ try {
   await pane.getByRole('button', { name: '■ 停止' }).click();
   await until(async () => /待命|已結束/.test(await otherPane.textContent()));
   expect(true, 'stop on one device ends it on the other');
+
+  // Project changes are shared across clients and a stale start fails closed.
+  await other.getByTestId('pane-claude').getByRole('button', { name: '■ 停止' }).click();
+  await until(async () => /待命|已結束/.test(await claude.textContent()));
+  await other.click('text=選擇專案…');
+  await other.getByRole('button', { name: '↰ 上一層' }).click();
+  await other.getByRole('button', { name: '▱ project-two', exact: true }).click();
+  await other.click('text=使用此資料夾');
+  await page.locator('strong').filter({ hasText: project2 }).waitFor();
+  await other.locator('strong').filter({ hasText: project2 }).waitFor();
+  const stale = await page.evaluate(old => window.desk.start('codex', 80, 24, old), project);
+  expect(!stale.ok && stale.error.includes('其他裝置變更'), 'stale project cannot start a terminal');
+  await pane.getByRole('button', { name: '▶ 啟動' }).click();
+  await until(async () => (await pane.textContent()).includes('READY:codex:TTY=true'));
+  await page.getByTestId('terminal-codex').click(); await page.keyboard.type('cwd'); await page.keyboard.press('Enter');
+  await until(async () => (await pane.textContent()).includes(`CWD:codex:${project2}`));
+  expect(true, 'both clients show selected folder and CLI runs in it');
+  await pane.getByRole('button', { name: '■ 停止' }).click();
+  await until(async () => /待命|已結束/.test(await otherPane.textContent()));
+  await other.getByRole('button', { name: '各自資料夾' }).click();
+  await until(async () => await page.getByRole('button', { name: '各自資料夾' }).getAttribute('aria-pressed') === 'true');
+  await other.getByRole('button', { name: '選擇 Codex CLI 的專案' }).click();
+  await other.getByRole('button', { name: '↰ 上一層' }).click();
+  await other.getByRole('button', { name: '▱ project', exact: true }).click();
+  await other.click('text=使用此資料夾');
+  await until(async () => (await page.locator('.project-path').allTextContents()).some(s => s.includes(project)));
+  const selected = await page.evaluate(() => window.desk.loadSettings());
+  expect(selected.ok && selected.value.settings.projectMode === 'separate' && selected.value.settings.projectPaths.codex === project, 'separate mode and per-AI folder synchronize');
+  const staleSeparate = await page.evaluate(old => window.desk.start('codex', 80, 24, old), project2);
+  expect(!staleSeparate.ok, 'stale per-AI project cannot start a terminal');
 
   // Change password: other device is signed out.
   await page.goto(base + '/account');

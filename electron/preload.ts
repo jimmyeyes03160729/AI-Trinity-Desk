@@ -35,7 +35,7 @@ const api: DeskApi = {
     ipcRenderer.on('installers:event',handler);
     return () => ipcRenderer.removeListener('installers:event',handler);
   },
-  start: (id, cols, rows) => ipcRenderer.invoke('terminal:start', { id, cols, rows }),
+  start: (id, cols, rows, expectedProject) => ipcRenderer.invoke('terminal:start', { id, cols, rows, expectedProject }),
   stop: id => ipcRenderer.invoke('terminal:stop', id),
   input: (id, session, data) => ipcRenderer.invoke('terminal:input', { id, session, data }),
   resize: (id, session, cols, rows) => ipcRenderer.invoke('terminal:resize', { id, session, cols, rows }),

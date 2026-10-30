@@ -30,16 +30,23 @@ export default function App() {
   const [providerLoading,setProviderLoading]=useState<Partial<Record<PaneId,boolean>>>({});
   const autoStarted = useRef(false);
   const workspace = useRef<HTMLDivElement>(null);
+  const latestProject = useRef<Settings | undefined>(undefined);
+  const withProject = (base: Settings, source: Settings): Settings => ({ ...base, projectPath: source.projectPath, projectPaths: source.projectPaths, projectMode: source.projectMode });
   useEffect(()=>{
     if(!showProviders||!settings)return;
     const timer=setInterval(()=>{if(document.visibilityState==='visible')for(const id of current.current!.visiblePanes)void refreshProvider(id);},60000);
     return ()=>clearInterval(timer);
   },[showProviders]);
   useEffect(() => {
-    void window.desk.loadSettings().then(result => { if (result.ok) { current.current = result.value.settings; committed.current = result.value.settings; setSettings(result.value.settings); if (result.value.warning) setMessage(result.value.warning); if (!autoStarted.current) { autoStarted.current=true; void window.desk.ensureCli().then(result=>{if(result.ok)setInstallStates(result.value);else setMessage(result.error);}); } } else setMessage(result.error); });
+    const offProject = window.desk.onProjectChange?.(updated => {
+      latestProject.current = updated;
+      if (current.current) { current.current = withProject(current.current, updated); setSettings(current.current); }
+      if (committed.current) committed.current = withProject(committed.current, updated);
+    });
+    void window.desk.loadSettings().then(result => { if (result.ok) { const loaded = latestProject.current ? withProject(result.value.settings, latestProject.current) : result.value.settings; current.current = loaded; committed.current = loaded; setSettings(loaded); if (result.value.warning) setMessage(result.value.warning); if (!autoStarted.current) { autoStarted.current=true; void window.desk.ensureCli().then(result=>{if(result.ok)setInstallStates(result.value);else setMessage(result.error);}); } } else setMessage(result.error); });
     const off = window.desk.onInstall(setInstallStates);
     void window.desk.installers().then(result=>{if(result.ok)setInstallStates(result.value);});
-    return off;
+    return () => { off(); offProject?.(); };
   }, []);
   const changeActive = useCallback((id: PaneId, value: boolean) => setActive(previous => ({ ...previous, [id]: value })), []);
   const persist = useCallback((next: Settings): Promise<boolean> => {
@@ -47,7 +54,7 @@ export default function App() {
     const task = saveQueue.current.catch(() => {}).then(async () => {
       const result = await window.desk.saveSettings(next);
       if (!result.ok) { setMessage('設定未儲存：' + result.error); if (current.current === next && committed.current) { current.current = committed.current; setSettings(committed.current); } return false; }
-      committed.current = result.value;
+      committed.current = latestProject.current ? withProject(result.value, latestProject.current) : result.value;
       return true;
     });
     saveQueue.current = task; return task;
@@ -56,7 +63,7 @@ export default function App() {
     await saveQueue.current;
     const result = await window.desk.chooseProject(id);
     if (!result.ok) setMessage(result.error);
-    else if (result.value && current.current) { const next = { ...current.current, projectPath: result.value.projectPath, projectPaths: result.value.projectPaths }; current.current = next; committed.current = next; setSettings(next); }
+    else if (!window.desk.web && result.value && current.current) { const next = withProject(current.current, result.value); current.current = next; committed.current = next; setSettings(next); }
   }
   async function detect() {
     setShowMarket(false);setShowDiscussion(false);
