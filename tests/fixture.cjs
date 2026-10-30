@@ -8,7 +8,7 @@ terminalInput.on('SIGINT',()=>console.log(`INTERRUPT:${tag}`));
 terminalInput.on('line', line => {
   if (line === 'cwd') { console.log(`CWD:${tag}:${process.cwd()}`); return; }
   if (line === 'ui') { console.log('Accept'); return; }
-  if (line === 'status-ui') { console.log('\x1b[33m▶▶ auto mode on\x1b[0m (shift+tab to cycle) · esc to interrupt'); console.log('✻ Spinning… (9s · ↓ 247 tokens)'); return; }
+  if (line === 'status-ui') { console.log('\x1b[33m▶▶\x1b[1Cauto\x1b[1Cmode\x1b[1Con\x1b[0m\x1b[1C(shift+tab\x1b[1Cto\x1b[1Ccycle) · esc to interrupt'); console.log('✻\x1b[1CBlanching… (9s · ↓ 247 tokens)'); return; }
   if (line === 'codex-ui') { console.log('› Ask Codex to do anything'); console.log('? for shortcuts   100% context left'); return; }
   if(line==='fullscreen'){
     process.stdout._refreshSize();const rows=process.stdout.rows;

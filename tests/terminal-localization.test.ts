@@ -10,10 +10,10 @@ test('localized output preserves control sequences, cell widths and unknown text
   const width = (s: string) => [...s].reduce((n, c) => n + (c.codePointAt(0)! > 0xff ? 2 : 1), 0);
   assert.equal(width(translated), en.length);
   const stream = new TerminalLocalization('codex');
-  assert.equal(stream.feed('\x1b[3', true) + stream.feed('1m' + en + '\x1b[0m', true), '\x1b[31m' + translated + '\x1b[0m');
+  assert.equal(stream.feed('\x1b[3', true) + stream.feed('1m' + en + '\x1b[0m', true) + stream.drain(), '\x1b[31m' + translated + '\x1b[0m');
   assert.equal(stream.feed('\x1b]0;', true) + stream.feed(en + '\x07', true), '\x1b]0;' + en + '\x07');
-  assert.equal(stream.feed(en, false), en);
-  assert.equal(stream.feed('user code `not-a-ui-phrase`', true), 'user code `not-a-ui-phrase`');
+  assert.equal(stream.feed(en, false) + stream.drain(), en);
+  assert.equal(stream.feed('user code `not-a-ui-phrase`', true) + stream.drain(), 'user code `not-a-ui-phrase`');
   assert.equal(translateRun('antigravity', en), en);
 });
 
@@ -55,4 +55,24 @@ test('Claude status fragments next to symbols and counters are localized without
   assert.equal(split.feed('▶▶ auto mo', true) + split.feed('de on\r\n', true), translateRun('claude', '▶▶ auto mode on') + '\r\n');
   assert.equal(split.feed('Spinn', true), '');
   assert.equal(split.drain(), 'Spinn');
+  const conpty = new TerminalLocalization('claude');
+  assert.equal(conpty.feed('Dark\x1b[1Cmo', true) + conpty.feed('de\x1b[25;8H', true), '深色模式 \x1b[25;8H');
+  assert.match(conpty.feed('▶▶\x1b[1Cauto\x1b[1Cmode\x1b[1Con\x1b[1C(shift+tab\x1b[1Cto\x1b[1Ccycle)\r\n', true), /自動模式.*切換/);
+  assert.match(conpty.feed('\x1b[31mBlanching…\x1b[0m\r\n', true), /處理中/);
+  assert.match(conpty.feed('✻\x1b[1CBlanching…\x1b[1C(6s · ↓ 298 tokens)\r\n', true), /處理中/);
+  assert.match(conpty.feed('Reading\x1b[1CC:\\example\\document.md\r\n', true), /讀取/);
+  assert.equal(translateRun('claude', 'The AI is Blanching… the vegetables'), 'The AI is Blanching… the vegetables');
+  const unchanged = '\x1b[31munknown\x1b[3Ctext\x1b[0m\x1b[4;2Hnext\r\n';
+  const pass = new TerminalLocalization('claude');
+  let passed = '';
+  for (const ch of unchanged) passed += pass.feed(ch, true);
+  assert.equal(passed + pass.drain(), unchanged);
+  const disabled = new TerminalLocalization('claude');
+  let original = '';
+  for (const ch of unchanged) original += disabled.feed(ch, false);
+  assert.equal(original + disabled.drain(), unchanged);
+  const styled = new TerminalLocalization('claude');
+  const styledOutput = styled.feed('\x1b[33mauto\x1b[0m\x1b[1Cmode\x1b[1Con\r\n', true);
+  assert.match(styledOutput, /自動模式/);
+  assert.ok(styledOutput.includes('\x1b[33m') && styledOutput.includes('\x1b[0m'));
 });
