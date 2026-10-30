@@ -4,6 +4,10 @@
 
 以 Electron + React + TypeScript + xterm.js + node-pty 建立的本機桌面工作台，同時顯示 Claude Code、Antigravity CLI 和 Codex CLI。Windows x64 為主要目標，提供 macOS 原生架構建置設定。
 
+## 網頁版：放在 Mac mini 駐點，其他電腦用瀏覽器連線
+
+除了桌面版，也可以把 AI Trinity Desk 跑成網頁伺服器，其他電腦透過 Tailscale 或 Cloudflare Tunnel 在不同網路直接開網頁使用。第一次開啟時用主機顯示的設定碼建立唯一的帳號密碼，之後不能再新增帳號。安裝、連線方式與安全說明見 [docs/WEB.md](docs/WEB.md)。
+
 ## 安裝與開始
 
 Windows 使用 `release/AI-Trinity-Desk-1.3.0-win-x64.exe` 安裝，可選安裝位置，預設安裝到目前使用者。安裝包包含 Electron 與終端元件。開啟時會自動檢查並安裝缺少的三家官方 CLI，不需要先裝 Node.js；帳號登入仍由你完成。
