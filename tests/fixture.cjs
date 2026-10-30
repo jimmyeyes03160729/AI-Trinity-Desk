@@ -9,7 +9,9 @@ terminalInput.on('line', line => {
   if (line === 'cwd') { console.log(`CWD:${tag}:${process.cwd()}`); return; }
   if (line === 'ui') { console.log('Accept'); return; }
   if (line === 'status-ui') { console.log('\x1b[33m▶▶\x1b[1Cauto\x1b[1Cmode\x1b[1Con\x1b[0m'); console.log('(shift+tab\x1b[1Cto\x1b[1Ccycle)'); console.log('esc to interrupt'); console.log('✻\x1b[1CBlanching… (9s · ↓ 247 tokens)'); return; }
-  if (line === 'background-ui') { console.log('Working'); console.log('Completed'); console.log('0 awaiting input · 1 working · 2 completed'); console.log('describe a task for a new session'); console.log('enter to return'); console.log('space to reply'); console.log('ctrl+x to delete'); console.log('? for shortcuts'); return; }
+  if (line === 'background-ui') { console.log('0 awaiting input'); return; }
+  if (line === 'background-prompt') { console.log('describe a task for a new session'); return; }
+  if (line === 'background-shortcuts') { console.log('? for shortcuts'); return; }
   if (line === 'codex-ui') { console.log('› Ask Codex to do anything'); console.log('? for shortcuts   100% context left'); return; }
   if(line==='fullscreen'){
     process.stdout._refreshSize();const rows=process.stdout.rows;
