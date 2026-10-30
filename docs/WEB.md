@@ -1,11 +1,11 @@
 # AI Trinity Desk 網頁版（Mac mini 駐點）
 
-把 AI Trinity Desk 跑在一台常開的主機上（例如 Mac mini），其他電腦用瀏覽器連線操作。三個 CLI、CLI 任務、AI 互相對話、Skills 市場、模型與額度等功能都和桌面版一樣，全部在**主機上**執行：專案檔案、CLI 登入狀態和對話紀錄都留在主機，瀏覽器只負責顯示畫面和輸入。
+把 AI Trinity Desk 跑在一台常開的主機上（例如 Mac mini），其他電腦用瀏覽器連線操作。三個 CLI、AI 互相對話、Skills 市場、模型與額度等功能都和桌面版一樣，全部在**主機上**執行：專案檔案、CLI 登入狀態和對話紀錄都留在主機，瀏覽器只負責顯示畫面和輸入。
 
 ```
 其他電腦的瀏覽器 ──HTTPS──▶ Tailscale／Cloudflare Tunnel ──▶ Mac mini：AI Trinity Desk Web（127.0.0.1:8765）
                                                                 ├─ claude / codex / agy（PTY 終端）
-                                                                └─ 專案資料夾、設定、任務紀錄
+                                                                └─ 專案資料夾、設定、討論紀錄
 ```
 
 ## 1. 在 Mac mini 安裝
@@ -128,7 +128,7 @@ scripts/macos-web-service.sh logs
 | `TRINITY_ALLOWED_ORIGINS` | 空 | 允許的網址來源，例如 `https://desk.example.com`，多個用逗號分隔 |
 | `TRINITY_TRUST_PROXY` | 關 | 設 `1` 時讀取 `X-Forwarded-*`／`CF-Connecting-IP` |
 | `TRINITY_PROJECT_ROOTS` | 家目錄 | 可選為專案的資料夾範圍 |
-| `TRINITY_DATA_DIR` | 見上方 | 設定、帳號、任務與討論紀錄的位置 |
+| `TRINITY_DATA_DIR` | 見上方 | 設定、帳號與討論紀錄的位置 |
 | `TRINITY_TLS_CERT`／`TRINITY_TLS_KEY` | 空 | 由伺服器直接提供 HTTPS 時使用的憑證檔路徑 |
 
 ## 開發與測試

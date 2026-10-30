@@ -4,7 +4,7 @@ import { execFile } from 'node:child_process';
 import type { IPty } from 'node-pty';
 import { launchSpec, resolveExecutable } from './commands';
 import { commandWithModel } from './models';
-import type { PaneId, Settings, TerminalEvent, SessionInfo } from './contracts';
+import { projectFor, type PaneId, type Settings, type TerminalEvent, type SessionInfo } from './contracts';
 
 type Session = { pty: IPty; token: string; pending: number; paused: boolean; ended: Promise<void>; stopping?: Promise<void> };
 export type SpawnPty = (file: string, args: string[], options: Parameters<typeof import('node-pty').spawn>[2]) => IPty;
@@ -20,12 +20,13 @@ export class Sessions {
     if (this.sessions.has(id) || this.starting.has(id)) throw new Error('此欄位已啟動，請先停止或使用重新啟動。');
     this.starting.add(id);
     try {
-      if (!settings.projectPath || !(await stat(settings.projectPath)).isDirectory()) throw new Error('請先選擇有效的專案資料夾。');
+      const project = projectFor(settings, id);
+      if (!project || !(await stat(project)).isDirectory()) throw new Error(settings.projectMode === 'separate' ? '請先為此 AI 選擇有效的專案資料夾。' : '請先選擇有效的專案資料夾。');
       const command = commandWithModel(settings.commands[id],settings.models[id]);
       const executable = await resolveExecutable(command.executable, this.env);
       if (!executable) throw new Error(`尚未找到「${command.executable}」。請先在上方完成安裝，或在設定填入完整執行檔路徑。`);
       const spec = launchSpec(executable, command);
-      const pty = this.spawn(spec.file, spec.args, { name: 'xterm-256color', cwd: settings.projectPath, cols, rows, env: this.env as Record<string,string> });
+      const pty = this.spawn(spec.file, spec.args, { name: 'xterm-256color', cwd: project, cols, rows, env: this.env as Record<string,string> });
       const token = randomUUID();
       let finish!: () => void;
       const session: Session = { pty, token, pending: 0, paused: false, ended: new Promise(resolve => { finish = resolve; }) };

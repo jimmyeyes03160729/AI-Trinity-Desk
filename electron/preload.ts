@@ -2,21 +2,9 @@ import { contextBridge, ipcRenderer } from 'electron';
 import type { DeskApi, TerminalEvent, InstallState,DiscussionState,SkillInstallState } from './contracts';
 
 const api: DeskApi = {
-  cliTasks:()=>ipcRenderer.invoke('tasks:list'),
-  createCliTask:value=>ipcRenderer.invoke('tasks:create',value),
-  patchCliTask:value=>ipcRenderer.invoke('tasks:patch',value),
-  selectCliTask:id=>ipcRenderer.invoke('tasks:select',id),
-  bindCliTask:(id,nativeSessionId)=>ipcRenderer.invoke('tasks:bind',{id,nativeSessionId}),
-  startCliTask:(taskId,cols,rows)=>ipcRenderer.invoke('tasks:start',{taskId,cols,rows}),
-  stopCliTask:id=>ipcRenderer.invoke('tasks:stop',id),
-  cliTaskInput:(taskId,session,data)=>ipcRenderer.invoke('tasks:input',{taskId,session,data}),
-  cliTaskResize:(taskId,session,cols,rows)=>ipcRenderer.invoke('tasks:resize',{taskId,session,cols,rows}),
-  cliTaskAck:(taskId,session,bytes)=>ipcRenderer.send('tasks:ack',{taskId,session,bytes}),
-  attachCliTask:taskId=>ipcRenderer.invoke('tasks:attach',taskId),
-  onCliTasks:listener=>{const handler=(_:Electron.IpcRendererEvent,state:import('./contracts').CliTaskList)=>listener(state);ipcRenderer.on('tasks:event',handler);return()=>ipcRenderer.removeListener('tasks:event',handler);},
   loadSettings: () => ipcRenderer.invoke('settings:load'),
   saveSettings: settings => ipcRenderer.invoke('settings:save', settings),
-  chooseProject: () => ipcRenderer.invoke('project:choose'),
+  chooseProject: id => ipcRenderer.invoke('project:choose', id),
   detect: () => ipcRenderer.invoke('environment:detect'),
   providerInfo:id=>ipcRenderer.invoke('provider:info',id),
   skillMarket:query=>ipcRenderer.invoke('market:list',query),

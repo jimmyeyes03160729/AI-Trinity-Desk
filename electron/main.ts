@@ -3,7 +3,9 @@ import path from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { z } from 'zod';
 import { createBackend, type Backend } from './backend';
-import type { Result } from './contracts';
+import { paneIdSchema, projectFor, type PaneId, type Result } from './contracts';
+
+const paneLabels: Record<PaneId, string> = { claude: 'Claude Code', antigravity: 'Antigravity CLI', codex: 'Codex CLI' };
 
 if (!app.isPackaged && process.env.TRINITY_TEST_USER_DATA) app.setPath('userData', process.env.TRINITY_TEST_USER_DATA);
 let win: BrowserWindow | null = null;
@@ -35,11 +37,13 @@ async function boot() {
   }
   for (const [channel, fn] of backend.handlers) handle(channel, fn);
   for (const [channel, fn] of backend.notifications) ipcMain.on(channel, (event, value) => { if (authorized(event)) fn(value); });
-  handle('project:choose', async () => {
-    if (backend.terminalsActive) throw new Error('請先停止所有終端，再切換專案。');
-    const result = await dialog.showOpenDialog(win!, { title: '選擇三個 CLI 使用的專案資料夾', properties: ['openDirectory'], defaultPath: backend.settings.projectPath || app.getPath('documents') });
+  handle('project:choose', async value => {
+    const id = paneIdSchema.optional().parse(value ?? undefined);
+    backend.checkProjectChange(id);
+    const current = id ? projectFor(backend.settings, id) || backend.settings.projectPath : backend.settings.projectPath;
+    const result = await dialog.showOpenDialog(win!, { title: id ? `選擇 ${paneLabels[id]} 使用的專案資料夾` : '選擇三個 CLI 使用的專案資料夾', properties: ['openDirectory'], defaultPath: current || app.getPath('documents') });
     if (result.canceled || !result.filePaths[0]) return null;
-    return backend.setProject(result.filePaths[0]);
+    return backend.setProject(result.filePaths[0], id);
   });
   handle('market:open', async value => { await shell.openExternal(await backend.handlers.get('market:link')!(value) as string); return null; });
   handle('clipboard:read', async () => (await clipboard.readText()).slice(0, 1024 * 1024));

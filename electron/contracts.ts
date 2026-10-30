@@ -1,7 +1,7 @@
 import { z } from 'zod';
 
 import { paneIds } from './ids';
-export { paneIds } from './ids';
+export { paneIds, projectFor } from './ids';
 export const paneIdSchema = z.enum(paneIds);
 export type PaneId = z.infer<typeof paneIdSchema>;
 const text = z.string().max(8192).refine(v => !v.includes('\0'), '不可包含 NUL 字元');
@@ -16,13 +16,15 @@ export const settingsSchema = z.object({
   fontSize: z.number().int().min(10).max(24),
   autoInstallMissing: z.boolean().default(true),
   visiblePanes:z.array(paneIdSchema).min(1).max(3).refine(v=>new Set(v).size===v.length,'顯示欄位不可重複').default([...paneIds]),
-  models:z.object({claude:model,antigravity:model,codex:model}).strict().default({claude:'',antigravity:'',codex:''})
+  models:z.object({claude:model,antigravity:model,codex:model}).strict().default({claude:'',antigravity:'',codex:''}),
+  projectMode:z.enum(['shared','separate']).default('shared'),
+  projectPaths:z.object({claude:z.string().max(4096),antigravity:z.string().max(4096),codex:z.string().max(4096)}).strict().default({claude:'',antigravity:'',codex:''})
 }).strict();
 export type Settings = z.infer<typeof settingsSchema>;
 export type Command = z.infer<typeof commandSchema>;
 export const defaultSettings = (): Settings => ({ version: 1, projectPath: '', commands: {
   claude: { executable: 'claude', args: [] }, antigravity: { executable: 'agy', args: [] }, codex: { executable: 'codex', args: [] }
-}, layout: 'columns', sizes: [34,33,33], fontSize: 14, autoInstallMissing: true,visiblePanes:[...paneIds],models:{claude:'',antigravity:'',codex:''} });
+}, layout: 'columns', sizes: [34,33,33], fontSize: 14, autoInstallMissing: true,visiblePanes:[...paneIds],models:{claude:'',antigravity:'',codex:''},projectMode:'shared',projectPaths:{claude:'',antigravity:'',codex:''} });
 export const dimensionsSchema = z.object({ cols: z.number().int().min(2).max(1000), rows: z.number().int().min(1).max(500) }).strict();
 export const startSchema = dimensionsSchema.extend({ id: paneIdSchema });
 export const inputSchema = z.object({ id: paneIdSchema, session: z.string().uuid(), data: z.string().max(65536) }).strict();
@@ -30,22 +32,12 @@ export const resizeSchema = dimensionsSchema.extend({ id: paneIdSchema, session:
 export const ackSchema = z.object({ id: paneIdSchema, session: z.string().uuid(), bytes: z.number().int().min(1).max(65536) }).strict();
 export type SessionInfo = { session: string; pid: number };
 export type TerminalAttach = SessionInfo & { history: string };
-export type TerminalEvent = { id: PaneId; session: string; taskId?:string } & (
+export type TerminalEvent = { id: PaneId; session: string } & (
   { type: 'data'; data: string } | { type: 'exit'; exitCode: number; signal?: number } | { type: 'error'; message: string }
 );
 export type Detection = { id: PaneId; available: boolean; path?: string; message: string };
 export type Environment = { platform: string; arch: string; node: string; electron: string; shell: string; results: Detection[] };
 export type Result<T> = { ok: true; value: T } | { ok: false; error: string };
-export const cliTaskSchema=z.object({id:z.string().uuid(),provider:paneIdSchema,title:z.string().trim().min(1).max(120),projectPath:z.string().min(1).max(4096),model,createdAt:z.string().max(64),updatedAt:z.string().max(64),pinned:z.boolean(),archived:z.boolean(),nativeSessionId:z.string().uuid().optional(),launched:z.boolean().default(false)}).strict();
-export type CliTask=z.infer<typeof cliTaskSchema>;
-export type CliTaskInfo=CliTask&{running:boolean;resumeReady:boolean;warning?:string};
-export type CliTaskList={tasks:CliTaskInfo[];selected?:string;warning?:string};
-export const cliTaskCreateSchema=z.object({provider:paneIdSchema,title:z.string().trim().min(1).max(120),nativeSessionId:z.string().uuid().optional()}).strict();
-export const cliTaskPatchSchema=z.object({id:z.string().uuid(),title:z.string().trim().min(1).max(120).optional(),pinned:z.boolean().optional(),archived:z.boolean().optional()}).strict();
-export const cliTaskStartSchema=dimensionsSchema.extend({taskId:z.string().uuid()}).strict();
-export const cliTaskInputSchema=z.object({taskId:z.string().uuid(),session:z.string().uuid(),data:z.string().max(65536)}).strict();
-export const cliTaskResizeSchema=dimensionsSchema.extend({taskId:z.string().uuid(),session:z.string().uuid()}).strict();
-export const cliTaskAckSchema=z.object({taskId:z.string().uuid(),session:z.string().uuid(),bytes:z.number().int().min(1).max(65536)}).strict();
 export type InstallStatus = 'idle' | 'queued' | 'checking' | 'downloading' | 'installing' | 'ready' | 'error' | 'cancelled' | 'custom';
 export type InstallState = { id: PaneId; status: InstallStatus; message: string; log: string; path?: string; source?: string };
 export type ModelChoice={id:string;name:string};
@@ -79,21 +71,10 @@ export const marketLinkSchema=z.object({id:z.string().max(300),target:z.enum(['m
 export interface DeskApi {
   // Set by the browser client; the desktop app leaves it undefined.
   readonly web?: boolean;
-  cliTasks():Promise<Result<CliTaskList>>;
-  createCliTask(value:z.infer<typeof cliTaskCreateSchema>):Promise<Result<CliTaskList>>;
-  patchCliTask(value:z.infer<typeof cliTaskPatchSchema>):Promise<Result<CliTaskList>>;
-  selectCliTask(id:string):Promise<Result<CliTaskList>>;
-  bindCliTask(id:string,nativeSessionId:string):Promise<Result<CliTaskList>>;
-  startCliTask(taskId:string,cols:number,rows:number):Promise<Result<SessionInfo>>;
-  stopCliTask(taskId:string):Promise<Result<null>>;
-  cliTaskInput(taskId:string,session:string,data:string):Promise<Result<null>>;
-  cliTaskResize(taskId:string,session:string,cols:number,rows:number):Promise<Result<null>>;
-  cliTaskAck(taskId:string,session:string,bytes:number):void;
-  attachCliTask(taskId:string):Promise<Result<TerminalAttach|null>>;
-  onCliTasks(listener:(state:CliTaskList)=>void):()=>void;
   loadSettings(): Promise<Result<{ settings: Settings; warning?: string }>>;
   saveSettings(settings: Settings): Promise<Result<Settings>>;
-  chooseProject(): Promise<Result<string | null>>;
+  // Without a pane the shared folder changes; with one, only that AI's folder.
+  chooseProject(id?: PaneId): Promise<Result<Settings | null>>;
   detect(): Promise<Result<Environment>>;
   providerInfo(id:PaneId):Promise<Result<ProviderInfo>>;
   discussionState():Promise<Result<DiscussionState>>;

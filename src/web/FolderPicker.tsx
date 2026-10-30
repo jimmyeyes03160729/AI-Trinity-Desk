@@ -8,7 +8,7 @@ type Call = <T>(channel: string, value?: unknown) => Promise<Result<T>>;
 
 // The host's folders are browsed through the server, replacing the native
 // folder dialog of the desktop app.
-function Picker({ call, done }: { call: Call; done: (folder: string | null) => void }) {
+function Picker({ call, title, done }: { call: Call; title: string; done: (folder: string | null) => void }) {
   const [listing, setListing] = useState<Listing>();
   const [typed, setTyped] = useState('');
   const [error, setError] = useState('');
@@ -24,7 +24,7 @@ function Picker({ call, done }: { call: Call; done: (folder: string | null) => v
   const child = (name: string) => listing!.path.endsWith(separator) ? listing!.path + name : listing!.path + separator + name;
   return <div className="modal-backdrop" onMouseDown={event => { if (event.target === event.currentTarget) done(null); }}>
     <section className="settings-dialog folder-picker" role="dialog" aria-modal="true" aria-labelledby="folder-title" onKeyDown={event => { if (event.key === 'Escape') done(null); }}>
-      <header><div><span className="eyebrow">主機上的資料夾</span><h2 id="folder-title">選擇專案資料夾</h2></div><button aria-label="關閉" onClick={() => done(null)}>×</button></header>
+      <header><div><span className="eyebrow">主機上的資料夾</span><h2 id="folder-title">{title}</h2></div><button aria-label="關閉" onClick={() => done(null)}>×</button></header>
       <form className="folder-path" onSubmit={event => { event.preventDefault(); void open(typed); }}>
         <input aria-label="資料夾路徑" value={typed} spellCheck={false} onChange={event => setTyped(event.target.value)} />
         <button type="submit" disabled={loading}>前往</button>
@@ -41,11 +41,11 @@ function Picker({ call, done }: { call: Call; done: (folder: string | null) => v
   </div>;
 }
 
-export function pickFolder(call: Call) {
+export function pickFolder(call: Call, title = '選擇專案資料夾') {
   return new Promise<string | null>(resolve => {
     const host = document.createElement('div');
     document.body.append(host);
     const root = createRoot(host);
-    root.render(<Picker call={call} done={folder => { root.unmount(); host.remove(); resolve(folder); }} />);
+    root.render(<Picker call={call} title={title} done={folder => { root.unmount(); host.remove(); resolve(folder); }} />);
   });
 }
