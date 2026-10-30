@@ -76,3 +76,26 @@ test('Claude status fragments next to symbols and counters are localized without
   assert.match(styledOutput, /自動模式/);
   assert.ok(styledOutput.includes('\x1b[33m') && styledOutput.includes('\x1b[0m'));
 });
+
+test('Claude background session view translates its controls and preserves task content and paths', () => {
+  const samples: [string, string[]][] = [
+    ['New sessions: Opus 5.5 · medium effort · D:\\project', ['新工作階段：', '中等推理', 'D:\\project']],
+    ['0 awaiting input · 1 working · 2 completed', ['0 等待輸入', '1 執行中', '2 已完成']],
+    ['Your conversation moved to the background — enter opens it · esc returns to it · ctrl+c twice quits', ['對話已移至背景', 'Enter 開啟', 'Esc 返回', 'Ctrl+C 兩次離開']],
+    ['Working', ['執行中']], ['Completed', ['已完成']],
+    ['describe a task for a new session', ['描述新工作階段的任務']],
+    ['▶▶ auto mode · enter to return · space to reply · ctrl+x to delete · ? for shortcuts', ['自動模式', 'Enter 返回', 'Space 回覆', 'Ctrl+X 刪除', '? 快捷鍵']]
+  ];
+  for (const [source, expected] of samples) {
+    const output = translateRun('claude', source);
+    for (const value of expected) assert.ok(output.includes(value), `${source}: ${value}`);
+  }
+  const screen = new TerminalLocalization('claude');
+  let output = '';
+  const raw = '\x1b[2;3H0\x1b[1Cawaiting\x1b[1Cinput · 1\x1b[1Cworking · 2\x1b[1Ccompleted\x1b[3;2HYour\x1b[1Cconversation\x1b[1Cmoved\x1b[1Cto\x1b[1Cthe\x1b[1Cbackground\r\n';
+  for (let i = 0; i < raw.length; i += 5) output += screen.feed(raw.slice(i, i + 5), true);
+  output += screen.drain();
+  for (const value of ['等待輸入', '執行中', '已完成', '對話已移至背景']) assert.ok(output.includes(value), value);
+  assert.equal(translateRun('claude', 'Checking GitHub auth/reach and VM ssh'), 'Checking GitHub auth/reach and VM ssh');
+  assert.equal(translateRun('claude', 'git --status working'), 'git --status working');
+});

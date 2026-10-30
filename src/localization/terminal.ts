@@ -5,9 +5,15 @@ import type { PaneId } from '../../electron/contracts';
 const tables: Partial<Record<PaneId, Record<string, string>>> = { claude, codex };
 const fragments: Partial<Record<PaneId, ReadonlyArray<readonly [string, string]>>> = {
   claude: [
+    ['Your conversation moved to the background', '對話已移至背景'],
+    ['describe a task for a new session', '描述新工作階段的任務'],
     ['(ctrl+b to run in background)', '(Ctrl+B 背景執行)'], ['(shift+tab to cycle)', '(Shift+Tab 切換)'],
-    ['esc to interrupt', 'Esc 中斷'], ['auto mode on', '自動模式'], ['Spinning…', '處理中…'], ['Spinning...', '處理中...'],
-    ['Dark mode', '深色模式'], ['Light mode', '淺色模式']
+    ['shift+tab to cycle', 'Shift+Tab 切換'], ['ctrl+c twice quits', 'Ctrl+C 兩次離開'],
+    ['ctrl+x to delete', 'Ctrl+X 刪除'], ['space to reply', 'Space 回覆'], ['enter to return', 'Enter 返回'],
+    ['enter opens it', 'Enter 開啟'], ['esc returns to it', 'Esc 返回'], ['? for shortcuts', '? 快捷鍵'],
+    ['New sessions:', '新工作階段：'], ['medium effort', '中等推理'], ['awaiting input', '等待輸入'],
+    ['esc to interrupt', 'Esc 中斷'], ['auto mode on', '自動模式'], ['auto mode', '自動模式'],
+    ['Spinning…', '處理中…'], ['Spinning...', '處理中...'], ['Dark mode', '深色模式'], ['Light mode', '淺色模式']
   ],
   codex: [
     ['Ask Codex to do anything', '詢問 Codex 任務'], ['? for shortcuts', '? 快捷鍵'], ['100% context left', '剩餘上下文 100%'],
@@ -37,6 +43,13 @@ function edits(id: PaneId, text: string): Edit[] {
     found.push({ start, end, replacement: chinese + ' '.repeat(a - b) });
   };
   const trimmed = text.trim();
+  if (id === 'claude') {
+    const status: Record<string, string> = { Working: '執行中', Completed: '已完成' };
+    if (status[trimmed]) add(text.indexOf(trimmed), trimmed, status[trimmed]);
+    for (const match of text.matchAll(/\b\d+ (working|completed)\b/g)) {
+      const label = match[1]; add(match.index + match[0].length - label.length, label, label === 'working' ? '執行中' : '已完成');
+    }
+  }
   if (/^[\x20-\x7e]+$/.test(trimmed)) {
     const translation = tables[id]?.[trimmed];
     if (translation) add(text.indexOf(trimmed), trimmed, translation);
@@ -56,7 +69,7 @@ function edits(id: PaneId, text: string): Edit[] {
     while (true) {
       const at = text.indexOf(english, offset); if (at < 0) break;
       const before = text[at - 1] || '', after = text[at + english.length] || '';
-      if (!/[A-Za-z0-9_]/.test(before) && !/[A-Za-z0-9_]/.test(after)) add(at, english, chinese);
+      if (!/[A-Za-z0-9_-]/.test(before) && !/[A-Za-z0-9_-]/.test(after)) add(at, english, chinese);
       offset = at + english.length;
     }
   }

@@ -74,8 +74,11 @@ try {
   await waitText(page,'claude','自動模式'); await waitText(page,'claude','處理中');
   await expect.poll(async()=>await buffer(page,'claude')).toContain('切換');
   await expect.poll(async()=>await buffer(page,'claude')).toContain('中斷');
+  await input(page,'claude','background-ui');
+  await waitText(page,'claude','等待輸入'); await waitText(page,'claude','描述新工作階段的任務');
+  await waitText(page,'claude','快捷鍵');
   await page.getByRole('button',{name:'Claude Code 繁體中文顯示'}).click();
-  checks.push('Traditional Chinese display translates combined Claude status fragments with ANSI styling');
+  checks.push('Traditional Chinese display translates Claude status and background session controls in a narrow pane');
   await page.getByRole('button',{name:'Codex CLI 繁體中文顯示'}).click();
   await input(page,'codex','codex-ui');
   await waitText(page,'codex','詢問 Codex 任務'); await waitText(page,'codex','快捷鍵');
