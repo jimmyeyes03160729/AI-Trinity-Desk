@@ -71,9 +71,10 @@ try {
   checks.push('project skill picker displays Chinese descriptions and inserts CLI-specific references without submitting');
   await page.getByRole('button',{name:'Claude Code 繁體中文顯示'}).click();
   await input(page,'claude','status-ui');
-  await waitText(page,'claude','自動模式'); await waitText(page,'claude','處理中');
-  await expect.poll(async()=>await buffer(page,'claude')).toContain('切換');
-  await expect.poll(async()=>await buffer(page,'claude')).toContain('中斷');
+  await waitText(page,'claude','自動模式');
+  await input(page,'claude','status-cycle'); await waitText(page,'claude','切換');
+  await input(page,'claude','status-interrupt'); await waitText(page,'claude','中斷');
+  await input(page,'claude','status-spinner'); await waitText(page,'claude','處理中');
   await input(page,'claude','background-ui');
   await waitText(page,'claude','等待輸入');
   await page.locator('.visibility-menu summary').click();

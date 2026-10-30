@@ -8,7 +8,10 @@ terminalInput.on('SIGINT',()=>console.log(`INTERRUPT:${tag}`));
 terminalInput.on('line', line => {
   if (line === 'cwd') { console.log(`CWD:${tag}:${process.cwd()}`); return; }
   if (line === 'ui') { console.log('Accept'); return; }
-  if (line === 'status-ui') { console.log('\x1b[33m▶▶\x1b[1Cauto\x1b[1Cmode\x1b[1Con\x1b[0m'); console.log('(shift+tab\x1b[1Cto\x1b[1Ccycle)'); console.log('esc to interrupt'); console.log('✻\x1b[1CBlanching… (9s · ↓ 247 tokens)'); return; }
+  if (line === 'status-ui') { console.log('\x1b[33m▶▶\x1b[1Cauto\x1b[1Cmode\x1b[1Con\x1b[0m'); return; }
+  if (line === 'status-cycle') { console.log('(shift+tab\x1b[1Cto\x1b[1Ccycle)'); return; }
+  if (line === 'status-interrupt') { console.log('esc to interrupt'); return; }
+  if (line === 'status-spinner') { console.log('✻\x1b[1CBlanching… (9s · ↓ 247 tokens)'); return; }
   if (line === 'background-ui') { console.log('0 awaiting input'); return; }
   if (line === 'background-prompt') { console.log('describe a task for a new session'); return; }
   if (line === 'background-shortcuts') { console.log('? for shortcuts'); return; }
