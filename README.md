@@ -1,24 +1,44 @@
-# AI Trinity Desk
+<div align="center">
+  <img src="build/icon.png" alt="AI Trinity Desk 圖示" width="112">
+  <h1>AI Trinity Desk</h1>
+  <p><strong>三個 AI 工作夥伴，一個專注的工作空間。</strong></p>
+  <p>在同一個桌面工作台使用 Claude Code、Antigravity CLI 和 Codex CLI。</p>
+  <p>
+    <a href="https://github.com/jimmyeyes03160729/AI-Trinity-Desk/releases">下載 Windows 版</a> ·
+    <a href="#功能總覽">功能總覽</a> ·
+    <a href="#從原始碼建置與測試">從原始碼建置</a>
+  </p>
+  <p>Windows 優先 · 支援 macOS 建置 · MIT 授權</p>
+</div>
 
-AI Trinity Desk 是以 Electron、React、TypeScript、xterm.js 和 node-pty 建立的 AI CLI 工作台，讓你在同一個畫面使用 Claude Code、Antigravity CLI 和 Codex CLI。以 Windows 為主要使用平台，也提供 macOS 桌面建置及網頁版設定。
+---
 
 ## 功能總覽
+
+### 🖥️ 三個 AI，一個工作台
 
 - **三個獨立終端**：在同一個工作台使用 Claude Code、Antigravity CLI 與 Codex CLI。每個終端都有獨立互動式 PTY，可分別啟動、停止、重啟、清屏及查看錯誤。
 - **自選顯示與版面**：選擇要顯示的 AI 欄位、切換三欄或三列、拖曳調整大小及修改字體。隱藏欄位不會停止其執行中的 CLI。
 - **CLI 自動安裝與環境檢查**：預設檢查並嘗試安裝缺少的官方 CLI，可關閉、取消或重試；已安裝與自訂命令不會被自動覆蓋。可設定執行檔與啟動參數，並查看安裝與啟動錯誤。AI 帳號登入仍由各 CLI 自行處理。
 - **專案資料夾**：三個 AI 可共用資料夾，或各自選擇資料夾；個別資料夾未設定時沿用共用資料夾。執行中的終端須先停止，才能切換受影響的資料夾或模式。
 - **模型與用量**：選擇或手動輸入模型 ID，供下次啟動使用；支援時顯示帳號已用／剩餘比例及重置時間。可用資料依 CLI、登入方式與供應商而異，無資料不會當成零。
+
+### 💬 讓 AI 一起討論
+
 - **AI 互相對話**：選擇兩至三個 AI、指定回答順序、輪數與等候時間，依序傳遞回覆。可停止、接續同一場討論、延長等候或重試逾時回覆；最後一輪要求各方總結，並可在全員明確表示一致時提前停止。最新一場討論可保存與還原，也可複製紀錄。
+
+### 🧩 找到並安裝 Skills
+
 - **Skills 熱門市場**：瀏覽熱門排行、近期趨勢及搜尋結果，依本機專案技術訊號取得推薦；可讀取公開來源 Summary，使用所選 CLI 翻成繁體中文，並一鍵安裝至選定 AI 的 Skills 目錄，查看各 AI 的安裝狀態。
+
+### ⚙️ 用起來順手
+
 - **複製貼上與快捷鍵**：支援終端內複製、貼上、清屏及鍵盤操作；沒有選取文字時，Windows 的 `Ctrl+C` 保留中斷 CLI 功能。
-- **網頁版與遠端使用**：在自己的主機執行網頁伺服器，其他裝置可用瀏覽器連線；使用設定碼建立唯一帳號，並支援登入、變更密碼及本機重設帳號。可設定 `/desk/` 等路徑前綴。
-- **多裝置共用**：網頁版的裝置共用終端，斷線或重新整理後可接回仍在主機上執行的 CLI，並重播部分近期輸出；專案路徑與模式會同步，過期的專案資訊不能用來啟動終端。
 - **設定持久化**：保存 CLI 命令、模型偏好、專案路徑、顯示欄位、版面與字體等設定；各 CLI 的登入和對話紀錄由各 CLI 管理。
 
 ## 最新更新
 
-目前程式版本為 **1.3.0**；GitHub `main` 在已發布的 1.3.0 安裝程式之後，新增網頁版、共用／各自專案資料夾、`/desk/` 路徑支援，以及多裝置專案同步與啟動防護。已發布的安裝程式不包含這些後續原始碼變更，請勿將它視為最新 `main` 的建置。
+目前程式版本為 **1.3.0**。GitHub `main` 已加入共用／各自專案資料夾等更新；已發布的 1.3.0 安裝程式早於這些變更，想使用最新原始碼功能，請自行建置。
 
 最新版移除了先前的各 CLI 任務側欄；各 CLI 自己的對話歷史和接續方式依該 CLI 提供的功能操作。AI 互相對話的最新一場討論仍由本程式保存。
 
@@ -32,20 +52,6 @@ AI Trinity Desk 是以 Electron、React、TypeScript、xterm.js 和 node-pty 建
 4. 以「顯示欄位」選擇 AI，拖曳分隔線或切換三欄／三列調整版面。
 
 開啟工作台不會自動啟動 CLI。自動安裝可在設定中關閉；既有 CLI 和自訂命令由使用者管理。環境檢查只確認執行檔位置，不代表帳號、網路或服務連線已驗證。
-
-## 網頁版
-
-網頁版由自己的電腦執行伺服器與 CLI，瀏覽器連線後操作的是**主機上的**專案、CLI 和登入狀態。伺服器預設只監聽 `127.0.0.1:8765`。
-
-```bash
-npm ci
-npm run web:build
-TRINITY_BASE_PATH=/desk npm run web:start
-```
-
-在主機開啟 `http://127.0.0.1:8765/desk/`，第一次使用啟動訊息中的設定碼建立唯一帳號；帳號建立後不能再從網頁新增帳號，密碼可在登入後變更，忘記密碼可在主機本機重設。詳細設定、Mac mini 常駐服務、遠端 HTTPS 與重設方式見 [網頁版文件](docs/WEB.md)。
-
-異地存取需要另外設定加密通道與網站路由。`jimmyeyes.com/desk/` 目前是規劃中的網址，尚須依現有 Cloudflare 網站設定配置路由並測試，不能只把現有主網域 DNS 改指向 Tunnel。網頁登入者能以主機使用者身分操作 CLI，請保護帳號並限制主機帳號權限；Cloudflare Access 可作為額外驗證。
 
 ## 模型與帳號用量
 
@@ -84,9 +90,9 @@ TRINITY_BASE_PATH=/desk npm run web:start
 ## 終端與設定
 
 - Windows：選取文字後按 `Ctrl+C` 複製，`Ctrl+V` 貼上；也支援 `Ctrl+Shift+C / V`。未選取文字時 `Ctrl+C` 用於中斷。
-- macOS：`⌘C` 複製，`⌘V` 貼上。網頁版貼上也受瀏覽器和 HTTPS 權限影響。
+- macOS：`⌘C` 複製，`⌘V` 貼上。
 - 設定中的「執行檔」填命令名稱或完整路徑；啟動參數使用 JSON 字串陣列，例如 `["--help"]`，無參數則填 `[]`。
-- Windows 桌面設定通常在 `%APPDATA%\AI Trinity Desk\settings.json`，macOS 桌面設定通常在 `~/Library/Application Support/AI Trinity Desk/settings.json`；網頁版使用獨立資料目錄。
+- Windows 桌面設定通常在 `%APPDATA%\AI Trinity Desk\settings.json`，macOS 桌面設定通常在 `~/Library/Application Support/AI Trinity Desk/settings.json`。
 
 CLI 與 PTY 以主機使用者身分執行，能存取及修改該使用者有權限存取的檔案，專案選擇範圍不是安全沙箱。不要把密碼或 API 金鑰填入會明文保存的啟動參數。自動 Git worktree 隔離尚未實作。
 
@@ -100,11 +106,9 @@ npm run dev          # 桌面開發模式
 npm test             # 單元測試
 npm run test:e2e     # Electron 端到端測試
 npm run build        # 桌面版建置
-npm run web:build    # 網頁版建置
-npm run test:web     # 網頁版端到端測試，需要 Playwright 瀏覽器
 ```
 
-網頁測試可使用 `TRINITY_CHROMIUM` 指定已安裝的 Chromium／Chrome；設定 `TRINITY_TEST_BASE_PATH=/desk` 可測試子路徑。測試使用隔離的暫存資料與測試 CLI，並非實際 AI 服務驗證。
+測試使用隔離的暫存資料與測試 CLI，並非實際 AI 服務驗證。
 
 Windows 安裝程式：
 
@@ -119,9 +123,9 @@ npm run dist:mac:arm64 -- --publish never
 npm run dist:mac:x64 -- --publish never
 ```
 
-安裝程式輸出至 `release/`。macOS 發布需另行處理 Apple 簽署與公證；目前沒有在實際 Mac mini 上驗證本次網頁部署。node-pty 載入失敗時，先執行 `npm run postinstall` 檢查；需要從原始碼重編時，須安裝對應平台的 C++ 建置工具後執行 `npm run rebuild:native`。
+安裝程式輸出至 `release/`。macOS 發布需另行處理 Apple 簽署與公證；macOS 尚未實機驗證。node-pty 載入失敗時，先執行 `npm run postinstall` 檢查；需要從原始碼重編時，須安裝對應平台的 C++ 建置工具後執行 `npm run rebuild:native`。
 
-GitHub Actions 在 Windows 執行單元測試、網頁測試、桌面端到端測試及安裝包建置；macOS 工作流程需手動啟動。測試使用本機假 CLI 或合成資料，不等於真實供應商、帳號及所有平台均已驗證。
+GitHub Actions 在 Windows 執行單元測試、桌面端到端測試及安裝包建置；macOS 工作流程需手動啟動。測試使用本機假 CLI 或合成資料，不等於真實供應商、帳號及所有平台均已驗證。
 
 ## 故障排除
 
@@ -131,8 +135,6 @@ GitHub Actions 在 Windows 執行單元測試、網頁測試、桌面端到端�
 | CLI 立即結束 | 查看終端輸出及退出代碼，確認該 CLI 的登入、參數與網路服務。 |
 | 地區或服務連線受限 | 依供應商的錯誤訊息及帳號、地區規則處理；重裝不一定能解決。 |
 | 專案切換被拒絕 | 先停止受影響的終端；切換共用資料夾或模式前需停止所有終端。 |
-| 網頁終端無法連線 | 檢查主機服務、HTTPS 路由、`/desk` 前綴及 WebSocket；詳見 [網頁版文件](docs/WEB.md)。 |
-| 網頁版提示專案已變更 | 確認畫面同步後的資料夾，再重新啟動終端。 |
 | PTY 元件無法載入 | 重新安裝套件或應用程式；開發環境可檢查原生元件並視需要重編。 |
 
 專案採用 [MIT 授權](LICENSE)。
