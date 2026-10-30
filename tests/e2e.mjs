@@ -59,6 +59,7 @@ try {
   await page.getByRole('button',{name:'環境檢查',exact:true}).click(); await expect(page.locator('.detection-grid .found')).toHaveCount(3);
   await page.getByRole('button',{name:'關閉環境檢查'}).click();
   for (const id of ids) { await page.getByTestId(`pane-${id}`).getByRole('button',{name:'▶ 啟動',exact:true}).click(); await waitText(page,id,`READY:${id}:TTY=true`); }
+  await expect.poll(async()=> (await buffer(page,'codex')).replace(/\s/g,'')).toContain('ARGS:codex:["--model","fixture-model"]');
   for (let i=0;i<ids.length;i++) {
     await page.getByRole('button',{name:`${labels[i]} 選擇 Skill`}).click();
     const dialog=page.getByRole('dialog',{name:`${labels[i]} 已安裝的 Skills`});
@@ -96,7 +97,6 @@ try {
   await waitText(page,'codex','詢問 Codex 任務'); await waitText(page,'codex','快捷鍵');
   await page.getByRole('button',{name:'Codex CLI 繁體中文顯示'}).click();
   checks.push('Traditional Chinese display translates combined Codex prompt and shortcuts');
-  await expect.poll(async()=> (await buffer(page,'codex')).replace(/\s/g,'')).toContain('ARGS:codex:["--model","fixture-model"]');
   await input(page,'codex','cwd');
   await expect.poll(async()=> (await buffer(page,'codex')).replace(/\s/g,''),{timeout:20000}).toContain(('CWD:codex:'+project).replace(/\s/g,''));
   checks.push('manual model setting passes the correct CLI flag');
