@@ -123,6 +123,8 @@ try {
   const png = Buffer.from('89504e470d0a1a0a0000000d4948445200000001000000010806000000', 'hex');
   const uploads = path.join(home, '.ai-trinity-desk', 'uploads');
   await page.getByTestId('image-input-codex').setInputFiles({ name: 'screenshot.png', mimeType: 'image/png', buffer: png });
+  const first = await until(async () => (await fs.readdir(uploads).catch(() => []))[0]);
+  await until(async () => (await pane.textContent()).includes(first));
   await page.getByTestId('terminal-codex').click(); await page.keyboard.press('Enter');
   const uploaded = await until(async () => (await pane.textContent()).match(/ECHO:codex:(\S+\.png)/)?.[1]);
   expect(uploaded.startsWith(uploads) && (await fs.readFile(uploaded)).equals(png), 'image button uploads to the host and inserts the host path');
@@ -130,9 +132,12 @@ try {
     const data = new DataTransfer(); data.items.add(new File([new Uint8Array(bytes)], 'clip.png', { type: 'image/png' }));
     element.dispatchEvent(new ClipboardEvent('paste', { clipboardData: data, bubbles: true, cancelable: true }));
   }, [...png]);
-  await until(async () => (await fs.readdir(uploads)).length === 2);
+  // The path reaches the prompt only after the browser receives the upload
+  // response; wait for it before submitting.
+  const pasted = await until(async () => (await fs.readdir(uploads)).find(name => !uploaded.endsWith(name)));
+  await until(async () => (await pane.textContent()).includes(pasted));
   await page.keyboard.press('Enter');
-  await until(async () => [...(await pane.textContent()).matchAll(/ECHO:codex:\S+\.png/g)].length === 2);
+  await until(async () => (await pane.textContent()).includes('ECHO:codex:' + path.join(uploads, pasted)));
   expect(true, 'pasting a screenshot uploads it and inserts the path');
   const post = (headers, body) => fetch(base + '/api/upload', { method: 'POST', headers: { 'Content-Type': 'application/octet-stream', ...headers }, body });
   const session = (await page.context().cookies()).find(c => c.name === 'trinity_session');
