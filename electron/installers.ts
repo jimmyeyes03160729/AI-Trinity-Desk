@@ -8,6 +8,9 @@ import { refreshCliPath, resolveExecutable } from './commands';
 import { windowsBootstrap } from './windows-bootstrap';
 
 export const cliCatalog = {
+  // The official script skips its setup wizard without a terminal; run
+  // `hermes setup` in the Hermes pane afterwards.
+  hermes: { command: 'hermes', win: 'https://hermes-agent.nousresearch.com/install.ps1', mac: 'https://hermes-agent.nousresearch.com/install.sh' },
   claude: { command: 'claude', win: 'https://claude.ai/install.ps1', mac: 'https://claude.ai/install.sh' },
   antigravity: { command: 'agy', win: 'https://antigravity.google/cli/install.ps1', mac: 'https://antigravity.google/cli/install.sh' },
   codex: { command: 'codex', win: 'https://chatgpt.com/codex/install.ps1', mac: 'https://chatgpt.com/codex/install.sh' }
@@ -23,7 +26,7 @@ type Dependencies = {
 
 export function validateInstallerUrl(value: string) {
   const url = new URL(value);
-  if (url.protocol !== 'https:' || url.username || url.password || url.port || !['claude.ai','downloads.claude.ai','antigravity.google','chatgpt.com','releases.openai.com'].includes(url.hostname)) throw new Error('拒絕未列入官方清單的 HTTPS 安裝來源：'+url.origin);
+  if (url.protocol !== 'https:' || url.username || url.password || url.port || !['claude.ai','downloads.claude.ai','antigravity.google','chatgpt.com','releases.openai.com','hermes-agent.nousresearch.com'].includes(url.hostname)) throw new Error('拒絕未列入官方清單的 HTTPS 安裝來源：'+url.origin);
   return url;
 }
 export async function downloadInstaller(initial: string, signal: AbortSignal, transport: typeof fetch = fetch): Promise<string> {
@@ -180,6 +183,7 @@ export class InstallerManager {
     signal.throwIfAborted();
     if (existing) { this.update(id,{status:'ready',message:'已找到 CLI，略過安裝；可啟動並登入。',path:existing}); return; }
     if (!['win32','darwin'].includes(this.platform)) throw new Error('自動安裝目前支援 Windows 與 macOS。');
+    if (id === 'hermes' && this.platform === 'win32') throw new Error('Windows 上請依 Hermes 官方說明手動安裝，完成後重新檢查。');
     if(this.platform==='win32'&&this.deps.native&&(id==='claude'||id==='codex')){
       this.update(id,{status:'installing',message:'正在下載並校驗官方原生 CLI 套件',source:'https://registry.npmjs.org',log:'官方原生 CLI 安裝\n'});
       const executable=await this.deps.native(id,this.env,signal,text=>this.update(id,{log:(this.states[id].log+text).slice(-65536)},false));

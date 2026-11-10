@@ -10,8 +10,8 @@ test('manual model overrides only existing model flags and does not mutate other
 });
 test('old settings retain CLI model defaults and model values reject command injection',()=>{
   const old:any=defaultSettings();delete old.models;
-  assert.deepEqual(settingsSchema.parse(old).models,{claude:'',antigravity:'',codex:''});
-  for(const value of ['a b','--dangerous','model\nrun','model;run'])assert.equal(settingsSchema.safeParse({...defaultSettings(),models:{claude:value,antigravity:'',codex:''}}).success,false);
+  assert.deepEqual(settingsSchema.parse(old).models,{hermes:'',claude:'',antigravity:'',codex:''});
+  for(const value of ['a b','--dangerous','model\nrun','model;run'])assert.equal(settingsSchema.safeParse({...defaultSettings(),models:{hermes:'',claude:value,antigravity:'',codex:''}}).success,false);
   assert.equal(settingsSchema.safeParse({...defaultSettings(),models:{claude:'sonnet[1m]',antigravity:'vendor/model-id',codex:'my-model'}}).success,true);
 });
 test('service restrictions have precise messages without treating every error as a region failure',()=>{

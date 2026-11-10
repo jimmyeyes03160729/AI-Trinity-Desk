@@ -48,11 +48,20 @@ test('settings writes are serialized, survive reload, and corruption is preserve
   assert.equal(await readFile(filename,'utf8'),'{invalid');
 });
 
+test('settings saved before Hermes gain a Hermes command and select it as the agent', () => {
+  const { hermes: _command, ...commands } = defaultSettings().commands;
+  const old = settingsSchema.parse({ version: 1, projectPath: '', commands, layout: 'columns', sizes: [34,33,33], fontSize: 14, visiblePanes: ['claude','codex'], models: { claude: 'opus', antigravity: '', codex: '' } });
+  assert.deepEqual(old.commands.hermes, { executable: 'hermes', args: [] });
+  assert.equal(old.models.hermes, '');
+  assert.equal(old.models.claude, 'opus');
+  assert.equal(old.agent, 'hermes');
+  assert.equal(settingsSchema.safeParse({ ...old, agent: 'other' }).success, false);
+});
 test('old settings default to a shared folder; separate mode uses each AI folder and falls back to the shared one', () => {
   const old = settingsSchema.parse({ version: 1, projectPath: 'D:/shared', commands: defaultSettings().commands, layout: 'columns', sizes: [34,33,33], fontSize: 14 });
   assert.equal(old.projectMode, 'shared');
-  assert.deepEqual(old.projectPaths, { claude: '', antigravity: '', codex: '' });
-  const separate = { ...old, projectMode: 'separate' as const, projectPaths: { claude: 'D:/claude', antigravity: '', codex: 'D:/codex' } };
+  assert.deepEqual(old.projectPaths, { hermes: '', claude: '', antigravity: '', codex: '' });
+  const separate = { ...old, projectMode: 'separate' as const, projectPaths: { hermes: '', claude: 'D:/claude', antigravity: '', codex: 'D:/codex' } };
   assert.equal(projectFor({ ...separate, projectMode: 'shared' }, 'claude'), 'D:/shared');
   assert.equal(projectFor(separate, 'claude'), 'D:/claude');
   assert.equal(projectFor(separate, 'codex'), 'D:/codex');

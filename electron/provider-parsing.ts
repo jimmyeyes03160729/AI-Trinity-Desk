@@ -21,3 +21,13 @@ export function agyModels(text:string):ModelChoice[]{
     if(match && /(?:gemini|claude|gpt|model)/i.test(match[1]))result.push({id:match[1],name:match[2].trim()});
   }return result.slice(0,100);
 }
+// `hermes usage --json`: windows carry used_percent and an ISO reset time.
+export function hermesWindows(value:any):UsageWindow[]{
+  if(!Array.isArray(value?.windows))return [];
+  const result:UsageWindow[]=[];
+  for(const window of value.windows.slice(0,20)){
+    if(typeof window?.used_percent!=='number'||!Number.isFinite(window.used_percent))continue;
+    const used=Math.min(100,Math.max(0,window.used_percent)),reset=typeof window.resets_at==='string'?Date.parse(window.resets_at):NaN;
+    result.push({label:[value.provider,value.plan,window.label].filter(v=>typeof v==='string'&&v).join(' · ').slice(0,120)||'Hermes',usedPercent:used,remainingPercent:100-used,...(Number.isFinite(reset)?{resetsAt:Math.floor(reset/1000)}:{})});
+  }return result;
+}

@@ -8,7 +8,7 @@ export default function SkillMarketPanel({projectPath,visible,onClose}:{projectP
   const [result,setResult]=useState<MarketResult>(),[loading,setLoading]=useState(false),[error,setError]=useState('');
   const serial=useRef(0);
   const content=useRef<HTMLDivElement>(null),queue=useRef(new Set<string>()),attempted=useRef(new Set<string>()),pumping=useRef(false),isVisible=useRef(visible);isVisible.current=visible;
-  const [autoTranslate,setAutoTranslate]=useState(true),[provider,setProvider]=useState<PaneId>('claude'),[translating,setTranslating]=useState<string[]>([]);
+  const [autoTranslate,setAutoTranslate]=useState(true),[provider,setProvider]=useState<PaneId>('hermes'),[translating,setTranslating]=useState<string[]>([]);
   const providerRef=useRef(provider);providerRef.current=provider;
   const [targets,setTargets]=useState<PaneId[]>([...paneIds]),[installed,setInstalled]=useState<SkillInstallState[]>([]),[installing,setInstalling]=useState<string[]>([]);
   useEffect(()=>window.desk.onSkillInstall(setInstalled),[]);

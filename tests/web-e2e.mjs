@@ -14,7 +14,7 @@ await fs.mkdir(path.join(project, '.agents', 'skills', 'demo'), { recursive: tru
 await fs.writeFile(path.join(project, '.agents', 'skills', 'demo', 'SKILL.md'), '---\nname: demo\ndescription: 測試技能用途\n---\n');
 const fixture = path.resolve('tests/fixture.cjs');
 const command = tag => ({ executable: process.execPath, args: [fixture, tag] });
-await fs.writeFile(path.join(data, 'settings.json'), JSON.stringify({ version: 1, projectPath: '', commands: { claude: command('claude'), antigravity: command('agy'), codex: command('codex') }, layout: 'columns', sizes: [34, 33, 33], fontSize: 14, autoInstallMissing: false }));
+await fs.writeFile(path.join(data, 'settings.json'), JSON.stringify({ version: 1, projectPath: '', commands: { hermes: command('hermes'), claude: command('claude'), antigravity: command('agy'), codex: command('codex') }, agent: 'hermes', layout: 'columns', sizes: [34, 33, 33], fontSize: 14, autoInstallMissing: false }));
 const port = 18000 + Math.floor(Math.random() * 1000), origin = `http://127.0.0.1:${port}`;
 const prefix = process.env.TRINITY_TEST_BASE_PATH || '';
 const base = origin + prefix;
@@ -72,6 +72,21 @@ try {
   const outside = await page.evaluate(({ prefix, outsidePath }) => new Promise(r => { const ws = new WebSocket('ws://' + location.host + prefix + '/ws'); ws.onopen = () => ws.send(JSON.stringify({ t: 'call', id: 1, ch: 'fs:list', v: outsidePath })); ws.onmessage = e => { r(JSON.parse(e.data).r); ws.close(); }; }), { prefix, outsidePath: path.parse(root).root });
   expect(!outside.ok, 'folders outside project roots are refused');
 
+  // Hermes is the default agent; switching agents keeps the others running.
+  const hermes = page.getByTestId('pane-hermes');
+  expect(await hermes.isVisible() && !(await page.getByTestId('pane-codex').isVisible()), 'Hermes is the only pane shown by default');
+  await hermes.getByRole('button', { name: '▶ 啟動' }).click();
+  await until(async () => (await hermes.textContent()).includes('READY:hermes:TTY=true'));
+  expect(true, 'Hermes starts in the workspace');
+  await page.getByRole('radio', { name: /Codex CLI/ }).click();
+  expect(await page.getByTestId('pane-codex').isVisible() && !(await hermes.isVisible()), 'agent picker switches the visible pane');
+  expect(await page.getByRole('radio', { name: /Hermes Agent/ }).locator('.live-dot').count() === 1, 'hidden Hermes still shows as running');
+  await page.getByRole('radio', { name: /Hermes Agent/ }).click();
+  expect((await hermes.textContent()).includes('READY:hermes'), 'switching back shows Hermes with its output intact');
+  await hermes.getByRole('button', { name: '■ 停止' }).click();
+  await until(async () => /待命|已結束/.test(await hermes.textContent()));
+  await page.getByRole('radio', { name: /Codex CLI/ }).click();
+
   // Terminal round trip.
   const pane = page.getByTestId('pane-codex');
   await pane.getByRole('button', { name: '▶ 啟動' }).click();
@@ -118,6 +133,7 @@ try {
   await until(async () => (await pane.textContent()).includes('ECHO:codex:from second'));
   expect(true, 'second device shares the session; output reaches both');
   const claude = page.getByTestId('pane-claude');
+  await other.getByRole('radio', { name: /Claude Code/ }).click();
   await other.getByTestId('pane-claude').getByRole('button', { name: '▶ 啟動' }).click();
   await until(async () => (await claude.textContent()).includes('READY:claude'));
   expect(true, 'terminal started on one device appears on the other');
@@ -145,6 +161,8 @@ try {
   await until(async () => /待命|已結束/.test(await otherPane.textContent()));
   await other.getByRole('button', { name: '各自資料夾' }).click();
   await until(async () => await page.getByRole('button', { name: '各自資料夾' }).getAttribute('aria-pressed') === 'true');
+  // In separate mode the bar shows the folder of the selected agent.
+  await other.getByRole('radio', { name: /Codex CLI/ }).click();
   await other.getByRole('button', { name: '選擇 Codex CLI 的專案' }).click();
   await other.getByRole('button', { name: '↰ 上一層' }).click();
   await other.getByRole('button', { name: '▱ project', exact: true }).click();

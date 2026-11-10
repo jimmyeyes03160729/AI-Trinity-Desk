@@ -5,7 +5,7 @@ import { z } from 'zod';
 import { createBackend, type Backend } from './backend';
 import { paneIdSchema, projectFor, type PaneId, type Result } from './contracts';
 
-const paneLabels: Record<PaneId, string> = { claude: 'Claude Code', antigravity: 'Antigravity CLI', codex: 'Codex CLI' };
+const paneLabels: Record<PaneId, string> = { hermes: 'Hermes Agent', claude: 'Claude Code', antigravity: 'Antigravity CLI', codex: 'Codex CLI' };
 
 if (!app.isPackaged && process.env.TRINITY_TEST_USER_DATA) app.setPath('userData', process.env.TRINITY_TEST_USER_DATA);
 let win: BrowserWindow | null = null;

@@ -10,21 +10,24 @@ export const commandSchema = z.object({ executable: text.min(1).max(2048), args:
 export const settingsSchema = z.object({
   version: z.literal(1),
   projectPath: z.string().max(4096),
-  commands: z.object({ claude: commandSchema, antigravity: commandSchema, codex: commandSchema }).strict(),
+  // Hermes defaults keep settings saved before it existed loadable.
+  commands: z.object({ hermes: commandSchema.default({ executable: 'hermes', args: [] }), claude: commandSchema, antigravity: commandSchema, codex: commandSchema }).strict(),
   layout: z.enum(['columns', 'rows']),
   sizes: z.tuple([z.number().min(15).max(70), z.number().min(15).max(70), z.number().min(15).max(70)]).refine(v => Math.abs(v.reduce((a,b) => a+b, 0)-100) < 0.1, '欄位比例總和必須為 100'),
   fontSize: z.number().int().min(10).max(24),
   autoInstallMissing: z.boolean().default(true),
-  visiblePanes:z.array(paneIdSchema).min(1).max(3).refine(v=>new Set(v).size===v.length,'顯示欄位不可重複').default([...paneIds]),
-  models:z.object({claude:model,antigravity:model,codex:model}).strict().default({claude:'',antigravity:'',codex:''}),
+  visiblePanes:z.array(paneIdSchema).min(1).max(paneIds.length).refine(v=>new Set(v).size===v.length,'顯示欄位不可重複').default([...paneIds]),
+  // The one AI agent shown in the workspace; others keep running when hidden.
+  agent:paneIdSchema.default('hermes'),
+  models:z.object({hermes:model.default(''),claude:model,antigravity:model,codex:model}).strict().default({hermes:'',claude:'',antigravity:'',codex:''}),
   projectMode:z.enum(['shared','separate']).default('shared'),
-  projectPaths:z.object({claude:z.string().max(4096),antigravity:z.string().max(4096),codex:z.string().max(4096)}).strict().default({claude:'',antigravity:'',codex:''})
+  projectPaths:z.object({hermes:z.string().max(4096).default(''),claude:z.string().max(4096),antigravity:z.string().max(4096),codex:z.string().max(4096)}).strict().default({hermes:'',claude:'',antigravity:'',codex:''})
 }).strict();
 export type Settings = z.infer<typeof settingsSchema>;
 export type Command = z.infer<typeof commandSchema>;
 export const defaultSettings = (): Settings => ({ version: 1, projectPath: '', commands: {
-  claude: { executable: 'claude', args: [] }, antigravity: { executable: 'agy', args: [] }, codex: { executable: 'codex', args: [] }
-}, layout: 'columns', sizes: [34,33,33], fontSize: 14, autoInstallMissing: true,visiblePanes:[...paneIds],models:{claude:'',antigravity:'',codex:''},projectMode:'shared',projectPaths:{claude:'',antigravity:'',codex:''} });
+  hermes: { executable: 'hermes', args: [] }, claude: { executable: 'claude', args: [] }, antigravity: { executable: 'agy', args: [] }, codex: { executable: 'codex', args: [] }
+}, layout: 'columns', sizes: [34,33,33], fontSize: 14, autoInstallMissing: true,visiblePanes:[...paneIds],agent:'hermes',models:{hermes:'',claude:'',antigravity:'',codex:''},projectMode:'shared',projectPaths:{hermes:'',claude:'',antigravity:'',codex:''} });
 export const dimensionsSchema = z.object({ cols: z.number().int().min(2).max(1000), rows: z.number().int().min(1).max(500) }).strict();
 export const startSchema = dimensionsSchema.extend({ id: paneIdSchema, expectedProject: z.string().max(4096).optional() });
 export const inputSchema = z.object({ id: paneIdSchema, session: z.string().uuid(), data: z.string().max(65536) }).strict();
@@ -45,13 +48,13 @@ export type UsageWindow={label:string;usedPercent:number;remainingPercent:number
 export type ProviderInfo={id:PaneId;models:ModelChoice[];windows:UsageWindow[];usageText?:string;message:string;source:string;updatedAt:string};
 export const discussionSchema=z.object({
   topic:z.string().trim().min(1).max(6000),
-  participants:z.array(paneIdSchema).min(2).max(3).refine(ids=>new Set(ids).size===ids.length,'參與的 AI 不可重複'),
+  participants:z.array(paneIdSchema).min(2).max(paneIds.length).refine(ids=>new Set(ids).size===ids.length,'參與的 AI 不可重複'),
   rounds:z.number().int().min(1).max(5),
   timeoutSeconds:z.number().int().min(30).max(600).default(180),
   autoStopAgreement:z.boolean().optional()
 }).strict();
 export type DiscussionConfig=z.infer<typeof discussionSchema>;
-export const continueDiscussionSchema=z.object({runId:z.string().uuid(),instruction:z.string().trim().max(3000),rounds:z.number().int().min(1).max(5),timeoutSeconds:z.number().int().min(30).max(600).default(180),participants:z.array(paneIdSchema).min(2).max(3).refine(ids=>new Set(ids).size===ids.length,'回答順序不可重複').optional()}).strict();
+export const continueDiscussionSchema=z.object({runId:z.string().uuid(),instruction:z.string().trim().max(3000),rounds:z.number().int().min(1).max(5),timeoutSeconds:z.number().int().min(30).max(600).default(180),participants:z.array(paneIdSchema).min(2).max(paneIds.length).refine(ids=>new Set(ids).size===ids.length,'回答順序不可重複').optional()}).strict();
 export type ContinueDiscussion=z.infer<typeof continueDiscussionSchema>;
 export const extendDiscussionSchema=z.object({runId:z.string().uuid(),seconds:z.number().int().min(30).max(600)}).strict();
 export const retryDiscussionSchema=z.object({runId:z.string().uuid(),timeoutSeconds:z.number().int().min(30).max(600)}).strict();
@@ -64,7 +67,7 @@ export type ProjectSignal={tag:string;label:string;evidence:string[]};
 export type ProjectProfile={name:string;signals:ProjectSignal[];scannedFiles:number;limited:boolean;warnings:string[];updatedAt:string};
 export type MarketSkill={id:string;name:string;source:string;slug:string;titleZh:string;summaryZh:string;summaryKind:'reviewed'|'name-only'|'original'|'translated';summaryOriginal?:string;summaryFetchedAt?:string;translatedAt?:string;translationProvider?:PaneId;translationError?:string;tags:string[];installs?:number;rank?:number;reasons:string[];relevance?:number;marketUrl:string;sourceUrl:string};
 export const skillEnrichSchema=z.object({ids:z.array(z.string().min(1).max(300)).min(1).max(4),provider:paneIdSchema}).strict();
-export const skillInstallSchema=z.object({id:z.string().min(1).max(300),targets:z.array(paneIdSchema).min(1).max(3).refine(ids=>new Set(ids).size===ids.length)}).strict();
+export const skillInstallSchema=z.object({id:z.string().min(1).max(300),targets:z.array(paneIdSchema).min(1).max(paneIds.length).refine(ids=>new Set(ids).size===ids.length)}).strict();
 export type SkillInstallState={id:string;ai:PaneId;status:'queued'|'downloading'|'installing'|'installed'|'existing'|'error'|'cancelled';folder?:string;commit?:string;message:string};
 export type LocalSkill={ai:PaneId;scope:'user'|'legacy'|'project';folder:string;name:string;description:string;descriptionZh?:string;translationSource?:'translated'|'converted';invocable:boolean;ambiguous?:boolean};
 export type MarketResult={skills:MarketSkill[];profile?:ProjectProfile;view:MarketQuery['view'];updatedAt:string;source:string;stale:boolean;warning?:string;total:number};

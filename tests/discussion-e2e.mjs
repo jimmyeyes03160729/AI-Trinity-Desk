@@ -48,6 +48,8 @@ try{
   let panel=page.getByRole('region',{name:'AI 互相對話',exact:true});await expect(panel).toBeVisible();
   await expect(panel.getByRole('button',{name:'開始討論',exact:true})).toBeDisabled();
   await panel.getByRole('textbox',{name:'討論主題',exact:true}).fill('Synthetic multi-AI relay test');
+  // Hermes joins by default; these checks use the three fixture CLIs.
+  await panel.getByRole('checkbox',{name:'討論參與 Hermes Agent',exact:true}).uncheck();
   await panel.getByRole('checkbox',{name:'討論參與 Antigravity CLI',exact:true}).uncheck();
   await panel.getByRole('checkbox',{name:'討論參與 Claude Code',exact:true}).uncheck();
   await expect(panel.getByRole('button',{name:'開始討論',exact:true})).toBeDisabled();
