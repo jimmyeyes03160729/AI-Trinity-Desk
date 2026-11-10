@@ -148,5 +148,6 @@ CLI 繁體中文顯示使用 [taekchef/claude-code-zh-cn](https://github.com/tae
 | 地區或服務連線受限 | 依供應商的錯誤訊息及帳號、地區規則處理；重裝不一定能解決。 |
 | 專案切換被拒絕 | 先停止受影響的終端；切換共用資料夾或模式前需停止所有終端。 |
 | PTY 元件無法載入 | 重新安裝套件或應用程式；開發環境可檢查原生元件並視需要重編。 |
+| macOS 終端啟動失敗：`posix_spawnp failed` | node-pty 附帶的 `spawn-helper` 缺少執行權限。執行 `npm install` 或 `npm ci` 時會自動修正；也可手動執行 `chmod 755 node_modules/node-pty/prebuilds/darwin-*/spawn-helper`。 |
 
 專案採用 [MIT 授權](LICENSE)。
