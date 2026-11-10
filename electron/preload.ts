@@ -43,6 +43,7 @@ const api: DeskApi = {
   resize: (id, session, cols, rows) => ipcRenderer.invoke('terminal:resize', { id, session, cols, rows }),
   ack: (id, session, bytes) => ipcRenderer.send('terminal:ack', { id, session, bytes }),
   attachTerminal: id => ipcRenderer.invoke('terminal:attach', id),
+  uploadImage: async image => ipcRenderer.invoke('upload:image', new Uint8Array(await image.arrayBuffer())),
   readClipboard: () => ipcRenderer.invoke('clipboard:read'),
   writeClipboard: text => ipcRenderer.invoke('clipboard:write', text),
   onTerminal: listener => {

@@ -72,6 +72,13 @@ try {
   const outside = await page.evaluate(({ prefix, outsidePath }) => new Promise(r => { const ws = new WebSocket('ws://' + location.host + prefix + '/ws'); ws.onopen = () => ws.send(JSON.stringify({ t: 'call', id: 1, ch: 'fs:list', v: outsidePath })); ws.onmessage = e => { r(JSON.parse(e.data).r); ws.close(); }; }), { prefix, outsidePath: path.parse(root).root });
   expect(!outside.ok, 'folders outside project roots are refused');
 
+  // The header starts collapsed: one toolbar row, no idle install panel.
+  expect(await page.locator('.app-shell.compact').count() === 1 && await page.getByRole('region', { name: 'CLI 自動安裝' }).count() === 0, 'header starts collapsed without the idle install panel');
+  await page.getByRole('button', { name: '▾ 展開' }).click();
+  await page.getByRole('region', { name: 'CLI 自動安裝' }).waitFor();
+  await page.reload(); await page.getByRole('button', { name: '▴ 收合' }).waitFor();
+  expect(await page.locator('.app-shell.compact').count() === 0, 'expanded header is remembered on this device');
+  await page.getByRole('button', { name: '▴ 收合' }).click();
   // Hermes is the default agent; switching agents keeps the others running.
   const hermes = page.getByTestId('pane-hermes');
   expect(await hermes.isVisible() && !(await page.getByTestId('pane-codex').isVisible()), 'Hermes is the only pane shown by default');
@@ -111,7 +118,29 @@ try {
   await page.getByTestId('terminal-codex').click(); await page.keyboard.type('hello web'); await page.keyboard.press('Enter');
   await until(async () => (await pane.textContent()).includes('ECHO:codex:hello web'));
   expect(true, 'terminal input and output over WebSocket');
-  await page.keyboard.type('burst'); await page.keyboard.press('Enter');
+
+  // Images are uploaded to the host and their host path is typed into the CLI.
+  const png = Buffer.from('89504e470d0a1a0a0000000d4948445200000001000000010806000000', 'hex');
+  const uploads = path.join(home, '.ai-trinity-desk', 'uploads');
+  await page.getByTestId('image-input-codex').setInputFiles({ name: 'screenshot.png', mimeType: 'image/png', buffer: png });
+  await page.getByTestId('terminal-codex').click(); await page.keyboard.press('Enter');
+  const uploaded = await until(async () => (await pane.textContent()).match(/ECHO:codex:(\S+\.png)/)?.[1]);
+  expect(uploaded.startsWith(uploads) && (await fs.readFile(uploaded)).equals(png), 'image button uploads to the host and inserts the host path');
+  await page.getByTestId('terminal-codex').locator('textarea').evaluate((element, bytes) => {
+    const data = new DataTransfer(); data.items.add(new File([new Uint8Array(bytes)], 'clip.png', { type: 'image/png' }));
+    element.dispatchEvent(new ClipboardEvent('paste', { clipboardData: data, bubbles: true, cancelable: true }));
+  }, [...png]);
+  await until(async () => (await fs.readdir(uploads)).length === 2);
+  await page.keyboard.press('Enter');
+  await until(async () => [...(await pane.textContent()).matchAll(/ECHO:codex:\S+\.png/g)].length === 2);
+  expect(true, 'pasting a screenshot uploads it and inserts the path');
+  const post = (headers, body) => fetch(base + '/api/upload', { method: 'POST', headers: { 'Content-Type': 'application/octet-stream', ...headers }, body });
+  const session = (await page.context().cookies()).find(c => c.name === 'trinity_session');
+  expect((await post({ Origin: origin }, png)).status === 401, 'upload requires login');
+  expect((await post({ Origin: 'https://evil.example', Cookie: `trinity_session=${session.value}` }, png)).status === 403, 'cross-site upload rejected');
+  const script = await post({ Origin: origin, Cookie: `trinity_session=${session.value}` }, Buffer.from('#!/bin/sh\necho pwned'));
+  expect(script.status === 400 && (await fs.readdir(uploads)).length === 2, 'non-image upload rejected and not saved');
+  await page.getByTestId('terminal-codex').click(); await page.keyboard.type('burst'); await page.keyboard.press('Enter');
   await until(async () => (await page.evaluate(() => document.querySelector('[data-testid=pane-codex]').textContent)).includes('BURST_DONE:codex'), 20000);
   expect(true, 'large output burst delivered');
 
