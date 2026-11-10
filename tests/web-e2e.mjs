@@ -141,7 +141,8 @@ try {
   const script = await post({ Origin: origin, Cookie: `trinity_session=${session.value}` }, Buffer.from('#!/bin/sh\necho pwned'));
   expect(script.status === 400 && (await fs.readdir(uploads)).length === 2, 'non-image upload rejected and not saved');
   await page.getByTestId('terminal-codex').click(); await page.keyboard.type('burst'); await page.keyboard.press('Enter');
-  await until(async () => (await page.evaluate(() => document.querySelector('[data-testid=pane-codex]').textContent)).includes('BURST_DONE:codex'), 20000);
+  try { await until(async () => (await page.evaluate(() => document.querySelector('[data-testid=pane-codex]').textContent)).includes('BURST_DONE:codex'), 20000); }
+  catch (error) { console.log('PANE TAIL:', JSON.stringify((await pane.locator('.xterm-rows').innerText()).slice(-1500))); console.log('FOCUS:', await page.evaluate(() => document.activeElement?.outerHTML.slice(0, 200))); throw error; }
   expect(true, 'large output burst delivered');
 
   // Reload: pane reattaches to the running CLI with its history.
