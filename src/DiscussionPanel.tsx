@@ -7,7 +7,7 @@ export function discussionMarkdown(state:DiscussionState){
   const notes=(index:number)=>(state.batches||[]).filter(b=>b.startRound>1&&b.messageStart===index).map(b=>`## 使用者接續重點（從第 ${b.startRound} 輪）\n\n${b.instruction||'繼續釐清尚未解決的分歧。'}${b.participants?`\n\n回答順序：${b.participants.map(id=>labels[id]).join(' → ')}`:''}`).join('\n\n');
   return `# AI 互相對話\n\n${state.config?.topic||''}\n\n`+state.messages.map((m,i)=>`${notes(i)}\n\n## 第 ${m.round} 輪 · ${labels[m.provider]}${m.model?`（${m.model}）`:''}\n\n${m.text}`).join('\n\n')+`\n\n${notes(state.messages.length)}`+(state.error?`\n\n討論停止原因：${state.error}`:'');
 }
-export default function DiscussionPanel({settings,onActive,onClose}:{settings:Settings;onActive:(active:boolean)=>void;onClose:()=>void}){
+export default function DiscussionPanel({settings,onActive,onClose,onMaintenanceBlock}:{settings:Settings;onActive:(active:boolean)=>void;onClose:()=>void;onMaintenanceBlock?:(blocked:boolean)=>void}){
   const [state,setState]=useState<DiscussionState>({status:'idle',messages:[],updatedAt:''});
   const [topic,setTopic]=useState('');
   const [instruction,setInstruction]=useState('');
@@ -18,9 +18,15 @@ export default function DiscussionPanel({settings,onActive,onClose}:{settings:Se
   const [follow,setFollow]=useState(true);
   const history=useRef<HTMLDivElement>(null);
   const active=state.status==='running'||state.status==='stopping';
+  const [restored,setRestored]=useState(false);
+  const initialParticipants=useRef([...participants]);
+  const baseline=state.config;
+  const draftOptions=JSON.stringify(participants)!==JSON.stringify(baseline?.participants||initialParticipants.current)||rounds!==(baseline?(state.batches?.at(-1)?.rounds||baseline.rounds):2)||timeout!==(baseline?.timeoutSeconds||180)||autoStopAgreement!==(baseline?.autoStopAgreement!==false);
+
+  useEffect(()=>{onMaintenanceBlock?.(!restored||draftOptions||busy||active||!!error||!!instruction.trim()||topic!==(state.config?.topic||'')||!!state.pendingTurn||!!state.storageError);},[restored,draftOptions,busy,active,error,instruction,topic,state.config,state.pendingTurn,state.storageError,onMaintenanceBlock]);
   useEffect(()=>{
     let alive=true,received=false;
-    const update=(next:DiscussionState)=>{if(!alive)return;setState(next);if(next.config){setTopic(next.config.topic);setParticipants(next.config.participants);setRounds(next.batches?.at(-1)?.rounds||next.config.rounds);setTimeoutSeconds(next.config.timeoutSeconds);setAutoStopAgreement(next.config.autoStopAgreement!==false);}};
+    const update=(next:DiscussionState)=>{if(!alive)return;setRestored(true);setState(next);if(next.config){setTopic(next.config.topic);setParticipants(next.config.participants);setRounds(next.batches?.at(-1)?.rounds||next.config.rounds);setTimeoutSeconds(next.config.timeoutSeconds);setAutoStopAgreement(next.config.autoStopAgreement!==false);}};
     const off=window.desk.onDiscussion(next=>{received=true;update(next);});
     void window.desk.discussionState().then(result=>{if(result.ok&&!received)update(result.value);else if(!result.ok&&alive)setError(result.error);});
     return()=>{alive=false;off();};
@@ -56,7 +62,7 @@ export default function DiscussionPanel({settings,onActive,onClose}:{settings:Se
   const notes=(index:number)=>(state.batches||[]).filter(b=>b.startRound>1&&b.messageStart===index).map(b=><aside className="discussion-followup" key={b.startRound}><strong>你的接續重點 · 從第 {b.startRound} 輪</strong><div>{b.instruction||'繼續釐清尚未解決的分歧。'}</div>{b.participants&&<small>回答順序：{b.participants.map(id=>labels[id]).join(' → ')}</small>}</aside>);
   return <section className="discussion-panel" aria-label="AI 互相對話">
     <header><div><h2>AI 互相對話</h2><p>沿用已安裝 CLI、登入與模型。選擇主題，讓 AI 輪流回應彼此，不需 Skills。</p></div><button aria-label="收合 AI 討論" onClick={onClose}>收合</button></header>
-    <div className="discussion-body"><div className="discussion-setup"><label>討論主題<textarea aria-label="討論主題" rows={5} maxLength={6000} value={topic} disabled={active||busy} placeholder="例如：討論這項功能的使用流程，互相提出問題，最後整理共識。" onChange={e=>setTopic(e.target.value)} /></label>
+    <div className="discussion-body"><div className="discussion-setup"><label>討論主題<textarea aria-label="討論主題" data-maintenance-saved={state.config?.topic||''} rows={5} maxLength={6000} value={topic} disabled={active||busy} placeholder="例如：討論這項功能的使用流程，互相提出問題，最後整理共識。" onChange={e=>setTopic(e.target.value)} /></label>
       <fieldset disabled={active||busy}><legend>參與的 AI 與回答順序</legend>{displayOrder.map(id=>{const index=participants.indexOf(id);return <div className="discussion-member" key={id}><span className="discussion-order-number">{index<0?'—':index+1}</span><div className="discussion-member-choice"><label><input type="checkbox" aria-label={`討論參與 ${labels[id]}`} checked={index>=0} onChange={e=>selectParticipant(id,e.target.checked)} /><span>{labels[id]}</span></label><small>{settings.models[id]||'CLI 預設模型'}</small></div><div className="discussion-order-buttons"><button type="button" aria-label={`${labels[id]} 提前回答`} title="上移" disabled={index<=0} onClick={()=>moveParticipant(id,-1)}>↑</button><button type="button" aria-label={`${labels[id]} 延後回答`} title="下移" disabled={index<0||index===participants.length-1} onClick={()=>moveParticipant(id,1)}>↓</button></div></div>;})}<p className="discussion-order-preview" data-testid="discussion-order-preview">回答順序：{participants.length?participants.map(id=>labels[id]).join(' → '):'請勾選 AI'}</p></fieldset>
       <div className="discussion-options"><label>討論輪數<select aria-label="討論輪數" value={rounds} disabled={active||busy} onChange={e=>setRounds(Number(e.target.value))}>{[1,2,3,4,5].map(n=><option value={n} key={n}>{n} 輪</option>)}</select></label><label>每次回覆等候<select aria-label="每次回覆等候" value={timeout} disabled={active||busy} onChange={e=>setTimeoutSeconds(Number(e.target.value))}>{[60,180,300,600].map(n=><option value={n} key={n}>{n/60} 分鐘</option>)}</select></label></div>
       <label className="discussion-agreement-option"><input type="checkbox" checked={autoStopAgreement} disabled={active||busy||state.messages.length>0} onChange={e=>setAutoStopAgreement(e.target.checked)} />全員明確表示一致時提前停止</label>

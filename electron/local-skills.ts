@@ -19,6 +19,7 @@ export class LocalSkills {
   private cache = new Map<string, string>();
   private initialized?: Promise<void>;
   private saveQueue: Promise<void> = Promise.resolve();
+  get active() { return this.controllers.size > 0; }
   constructor(private home: string, private dataDir: string, private settings: () => Settings, private run: DiscussionRunner) {}
   private roots(ai: PaneId) {
     const project = projectFor(this.settings(), ai);

@@ -1,5 +1,7 @@
-import { app, BrowserWindow, clipboard, dialog, ipcMain, Menu, shell } from 'electron';
+import { app, BrowserWindow, clipboard, dialog, ipcMain, Menu, shell, powerMonitor } from 'electron';
 import path from 'node:path';
+import { randomUUID } from 'node:crypto';
+import { IdleGate, requiredIdleSeconds, startMaintenanceServer } from './idle-maintenance';
 import { pathToFileURL } from 'node:url';
 import { z } from 'zod';
 import { createBackend, type Backend } from './backend';
@@ -29,9 +31,27 @@ async function boot() {
   function authorized(event: Electron.IpcMainInvokeEvent | Electron.IpcMainEvent) {
     return !!win && event.sender === win.webContents && event.senderFrame === win.webContents.mainFrame && event.senderFrame.url === trustedURL;
   }
+  let rendererState = { ready: false, blocked: true };
+  const validState = (value: unknown): value is { ready: boolean; blocked: boolean } => !!value && typeof value === 'object' && typeof (value as { ready?: unknown }).ready === 'boolean' && typeof (value as { blocked?: unknown }).blocked === 'boolean';
+  const gate = new IdleGate(() => ({ busy: [...backend.maintenanceBlockers, ...(rendererState.ready && rendererState.blocked ? ['仍有草稿、未完成操作或開啟中的設定面板'] : [])], unknown: !win || win.isDestroyed() || win.webContents.isLoading() || !rendererState.ready ? ['畫面狀態無法確認'] : [] }));
+  ipcMain.on('maintenance:state', (event, value) => { if (authorized(event) && validState(value)) { rendererState = value; if (!value.ready || value.blocked) gate.touch(); } });
+  ipcMain.on('maintenance:activity', event => { if (authorized(event)) gate.touch(); });
+  const probe = (freeze: boolean) => new Promise<boolean>(resolve => {
+    if (!win || win.isDestroyed() || win.webContents.isLoading()) { rendererState = { ready: false, blocked: true }; gate.touch(); resolve(false); return; }
+    const nonce = randomUUID();
+    const timer = setTimeout(() => { ipcMain.removeListener('maintenance:probe-result', reply); rendererState = { ready: false, blocked: true }; gate.touch(); resolve(false); }, 1500);
+    const reply = (event: Electron.IpcMainEvent, value: unknown) => {
+      if (!authorized(event) || !validState(value) || (value as { nonce?: unknown }).nonce !== nonce) return;
+      clearTimeout(timer); ipcMain.removeListener('maintenance:probe-result', reply); rendererState = value;
+      if (!value.ready || value.blocked) gate.touch();
+      resolve(value.ready && !value.blocked);
+    };
+    ipcMain.on('maintenance:probe-result', reply); win.webContents.send('maintenance:probe', { nonce, freeze });
+  });
+  const resume = () => { gate.release(); if (win && !win.isDestroyed()) win.webContents.send('maintenance:resume'); };
   function handle<T>(channel: string, fn: (value: unknown) => T | Promise<T>) {
     ipcMain.handle(channel, async (event, value): Promise<Result<T>> => {
-      try { if (!authorized(event)) throw new Error('拒絕未授權的請求。'); return { ok: true, value: await fn(value) }; }
+      try { if (!authorized(event)) throw new Error('拒絕未授權的請求。'); return { ok: true, value: await gate.track(() => fn(value)) }; }
       catch (error) { return { ok: false, error: error instanceof z.ZodError ? '輸入格式不符：' + error.issues.map(i => i.message).join('；') : error instanceof Error ? error.message : String(error) }; }
     });
   }
@@ -57,7 +77,9 @@ async function boot() {
     win.webContents.on('will-attach-webview', event => event.preventDefault());
     win.webContents.session.setPermissionRequestHandler((_webContents, _permission, callback) => callback(false));
     win.webContents.session.setPermissionCheckHandler(() => false);
-    win.webContents.on('render-process-gone', () => backend.abort());
+    win.webContents.on('render-process-gone', () => { rendererState = { ready: false, blocked: true }; gate.touch(); backend.abort(); });
+    win.webContents.on('did-start-loading', () => { rendererState = { ready: false, blocked: true }; gate.touch(); });
+    win.on('focus', () => gate.touch());
     win.once('ready-to-show', () => win?.show());
     win.on('close', event => {
       if(closing)return;
@@ -76,6 +98,30 @@ async function boot() {
     { label: '檢視', submenu: [{ role: 'resetZoom' }, { role: 'zoomIn' }, { role: 'zoomOut' }, { role: 'togglefullscreen' }] }
   ]));
   createWindow();
+  if (process.platform === 'darwin') {
+    const interval = setInterval(() => gate.status(), 1000); interval.unref();
+    powerMonitor.on('resume', () => gate.touch());
+    try {
+      const maintenance = await startMaintenanceServer({
+        userData: app.getPath('userData'),
+        status: async () => { await probe(false); return { ...gate.status(), userIdleSeconds: powerMonitor.getSystemIdleTime() }; },
+        restart: async () => {
+          if (quitting || powerMonitor.getSystemIdleTime() < requiredIdleSeconds) return { accepted: false, reason: 'Mac 最近仍有人操作，稍後再檢查' };
+          try {
+            if (!await probe(true) || !gate.acquire()) { resume(); return { accepted: false, reason: '尚未確認連續空閒 15 分鐘，或仍有工作／草稿' }; }
+            let deadline: ReturnType<typeof setTimeout> | undefined;
+            try { await Promise.race([backend.flush(), new Promise<never>((_, reject) => { deadline = setTimeout(() => reject(new Error('儲存逾時')), 2000); })]); }
+            finally { clearTimeout(deadline); }
+            if (backend.maintenanceBlockers.length || powerMonitor.getSystemIdleTime() < requiredIdleSeconds || !win || win.isDestroyed() || win.webContents.isLoading()) { resume(); return { accepted: false, reason: '重啟前狀態改變，已延後' }; }
+            app.relaunch(); closing = true; quitting = true;
+            setTimeout(() => app.quit(), 150);
+            return { accepted: true, reason: '已確認空閒，正在正常退出並重開' };
+          } catch { resume(); return { accepted: false, reason: '儲存或檢查失敗，已取消重啟' }; }
+        }
+      });
+      app.once('will-quit', () => { void maintenance.close(); });
+    } catch (error) { console.warn('安全重啟狀態服務未啟用：', error instanceof Error ? error.message : '狀態不明'); }
+  }
   app.on('activate', () => { if (!win) { closing = false; quitting = false; backend.reopen(); createWindow(); } });
 }
 app.on('window-all-closed', () => { if (process.platform !== 'darwin') app.quit(); });

@@ -2,6 +2,24 @@ import { contextBridge, ipcRenderer } from 'electron';
 import type { DeskApi, TerminalEvent, InstallState,DiscussionState,SkillInstallState } from './contracts';
 
 const api: DeskApi = {
+  maintenanceState: state => ipcRenderer.send('maintenance:state', state),
+  onMaintenanceProbe: read => {
+    const activity = () => ipcRenderer.send('maintenance:activity');
+    for (const event of ['input', 'keydown', 'pointerdown']) document.addEventListener(event, activity, true);
+    const probe = (_: Electron.IpcRendererEvent, request: { nonce: string; freeze: boolean }) => {
+      const reported = read();
+      // Inspect live values too: React's child-to-parent effects may not have
+      // settled when a maintenance request arrives immediately after typing.
+      const topic = document.querySelector<HTMLTextAreaElement>('textarea[data-maintenance-saved]');
+      const instruction = document.querySelector<HTMLTextAreaElement>('textarea[aria-label="補充問題或分歧"]');
+      const state = { ready: reported.ready, blocked: reported.blocked || !!document.querySelector('[role="dialog"]') || !!instruction?.value.trim() || !!(topic && topic.value !== topic.dataset.maintenanceSaved) };
+      if (request.freeze && state.ready && !state.blocked) document.body.inert = true;
+      ipcRenderer.send('maintenance:probe-result', { nonce: request.nonce, ...state });
+    };
+    const resume = () => { document.body.inert = false; };
+    ipcRenderer.on('maintenance:probe', probe); ipcRenderer.on('maintenance:resume', resume);
+    return () => { for (const event of ['input', 'keydown', 'pointerdown']) document.removeEventListener(event, activity, true); ipcRenderer.removeListener('maintenance:probe', probe); ipcRenderer.removeListener('maintenance:resume', resume); resume(); };
+  },
   loadSettings: () => ipcRenderer.invoke('settings:load'),
   saveSettings: settings => ipcRenderer.invoke('settings:save', settings),
   chooseProject: id => ipcRenderer.invoke('project:choose', id),

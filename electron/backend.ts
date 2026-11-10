@@ -207,7 +207,10 @@ export async function createBackend(host: BackendHost) {
       host.emit('project:event', settings);
       return settings;
     }); },
-    get busy() { return !!sessions?.active||installers.active||discussions.active||skillInstaller.active||skillSummaries.active; },
+    get busy() { return !!sessions?.active||installers.active||discussions.active||skillInstaller.active||skillSummaries.active||localSkills.active; },
+    get maintenanceBlockers() {
+      return [sessions?.active && 'CLI 工作階段尚未停止，無法確認內部任務', installers.active && 'CLI 安裝中', discussions.active && 'AI 討論中', skillInstaller.active && 'Skill 安裝中', skillSummaries.active && '市場翻譯中', localSkills.active && '本機 Skill 翻譯中', discussions.snapshot.storageError && '討論紀錄尚未儲存'].filter((value): value is string => typeof value === 'string');
+    },
     flush: () => discussions.flush(),
     shutdown: () => Promise.all([sessions?.stopAll(),installers.shutdown(),discussions.stop(),skillInstaller.shutdown(),skillSummaries.shutdown(),localSkills.shutdown()]),
     abort() { void sessions?.stopAll().catch(() => {});void discussions.stop();void skillInstaller.shutdown();void skillSummaries.shutdown();void localSkills.shutdown(); for (const id of paneIds) void installers.cancel(id); },

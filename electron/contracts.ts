@@ -75,6 +75,8 @@ export const marketLinkSchema=z.object({id:z.string().max(300),target:z.enum(['m
 export interface DeskApi {
   // Set by the browser client; the desktop app leaves it undefined.
   readonly web?: boolean;
+  maintenanceState?(state: { ready: boolean; blocked: boolean }): void;
+  onMaintenanceProbe?(read: () => { ready: boolean; blocked: boolean }): () => void;
   loadSettings(): Promise<Result<{ settings: Settings; warning?: string }>>;
   saveSettings(settings: Settings): Promise<Result<Settings>>;
   onProjectChange?(listener: (settings: Settings) => void): () => void;
