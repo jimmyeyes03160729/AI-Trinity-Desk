@@ -7,6 +7,7 @@ import { readFile, readdir, realpath, stat } from 'node:fs/promises';
 import { z } from 'zod';
 import { WebSocketServer, WebSocket } from 'ws';
 import { createBackend } from '../electron/backend';
+import { maxUploadBytes, saveUpload } from '../electron/uploads';
 import { paneIdSchema, type Result } from '../electron/contracts';
 import { Auth, readCookie } from './auth';
 import { accountPage, loginPage, setupPage } from './login-page';
@@ -169,6 +170,20 @@ async function main() {
       await auth.logout(token);
       for (const socket of clients) if (socket.token === token) socket.close(4001, 'logged out');
       json(res, 200, { ok: true }, { 'Set-Cookie': `${cookieName}=; Path=${appPath('/')}; HttpOnly; SameSite=Strict; Max-Age=0` });
+      return;
+    }
+    if (url.pathname === '/api/upload' && req.method === 'POST') {
+      if (!authorized(req)) { json(res, 401, { error: '請重新登入。' }); return; }
+      if (!sameOrigin(req)) { json(res, 403, { error: '拒絕跨站請求。' }); return; }
+      if (Number(req.headers['content-length'] || 0) > maxUploadBytes) { json(res, 413, { error: '圖片超過 20 MB 上限。' }); req.resume(); return; }
+      const parts: Buffer[] = []; let size = 0;
+      for await (const chunk of req) {
+        size += chunk.length;
+        if (size > maxUploadBytes) { json(res, 413, { error: '圖片超過 20 MB 上限。' }); req.destroy(); return; }
+        parts.push(chunk);
+      }
+      try { json(res, 200, { path: await saveUpload(backend.uploads, new Uint8Array(Buffer.concat(parts))) }); }
+      catch (error) { json(res, 400, { error: error instanceof Error ? error.message : String(error) }); }
       return;
     }
     if (url.pathname === '/api/session') { json(res, authorized(req) ? 200 : 401, { ok: authorized(req) }); return; }

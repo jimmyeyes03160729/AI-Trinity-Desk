@@ -112,6 +112,8 @@ export interface DeskApi {
   resize(id: PaneId, session: string, cols: number, rows: number): Promise<Result<null>>;
   ack(id: PaneId, session: string, bytes: number): void;
   attachTerminal(id: PaneId): Promise<Result<TerminalAttach | null>>;
+  // Saves an image on the machine running the CLIs and returns its path.
+  uploadImage(image: Blob): Promise<Result<string>>;
   readClipboard(): Promise<Result<string>>;
   writeClipboard(text: string): Promise<Result<null>>;
   onTerminal(listener: (event: TerminalEvent) => void): () => void;

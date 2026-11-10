@@ -19,6 +19,8 @@ test('gate tracks pending work, unknown state, the full idle interval, and exclu
   unknown = []; busy = ['CLI open']; assert.equal(gate.status().state, 'busy');
   busy = []; gate.status(); clock += 900_000; assert.equal(gate.acquire(), true);
 });
+// The bridge is a Unix socket used only by the macOS desktop app.
+const unixOnly = { skip: process.platform === 'win32' && 'Unix socket bridge is macOS-only' };
 function request(socket: string, value: unknown) {
   return new Promise<Record<string, unknown>>((resolve, reject) => {
     const client = createConnection(socket); let data = '';
@@ -28,7 +30,7 @@ function request(socket: string, value: unknown) {
     client.on('end', () => { try { resolve(JSON.parse(data)); } catch (error) { reject(error); } });
   });
 }
-test('local bridge rejects stale identity and unknown operations, serializes restart, and restricts access', async () => {
+test('local bridge rejects stale identity and unknown operations, serializes restart, and restricts access', unixOnly, async () => {
   const userData = await mkdtemp('/tmp/trinity-maintenance-'); let calls = 0;
   const options = {userData, status: async () => ({state:'idle' as const, reason:'fixture', idleForSeconds:1000}), restart: async () => { calls++; return {accepted:true, reason:'fixture; no actual restart'}; }};
   const server = await startMaintenanceServer(options);
@@ -44,7 +46,7 @@ test('local bridge rejects stale identity and unknown operations, serializes res
     await assert.rejects(startMaintenanceServer(options), /已有/);
   } finally { await server.close(); await rm(userData, {recursive:true,force:true}); }
 });
-test('bridge never replaces an unrelated file', async () => {
+test('bridge never replaces an unrelated file', unixOnly, async () => {
   const userData = await mkdtemp('/tmp/trinity-maintenance-');
   try { await writeFile(userData+'/memory-guard.sock', 'do not overwrite'); await assert.rejects(startMaintenanceServer({userData, status:async()=>({state:'idle',reason:'',idleForSeconds:0}),restart:async()=>({accepted:true,reason:''})}), /占用/); }
   finally { await rm(userData, {recursive:true,force:true}); }

@@ -46,6 +46,8 @@ async function input(page,id,line) {
 }
 try {
   let page=await launch();
+  // The header starts collapsed; these checks use the full header and install panel.
+  await page.getByRole('button',{name:'▾ 展開',exact:true}).click();
   await page.screenshot({path:path.join(artifacts,`${prefix}welcome.png`)});
   const security=await app.evaluate(({BrowserWindow})=>BrowserWindow.getAllWindows()[0].webContents.getLastWebPreferences());
   if (!security.sandbox || !security.contextIsolation || security.nodeIntegration) throw new Error('Unsafe BrowserWindow preferences');

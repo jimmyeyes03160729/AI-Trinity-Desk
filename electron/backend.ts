@@ -14,6 +14,7 @@ import {SkillMarket} from './skill-market';
 import {SkillSummaries} from './skill-summary';
 import {SkillInstaller,skillRoots} from './skill-install';
 import {LocalSkills} from './local-skills';
+import { pruneUploads, saveUpload, uploadDir } from './uploads';
 import { resolveExecutable, terminalEnvironment } from './commands';
 import { ackSchema, inputSchema, paneIds, paneIdSchema, projectFor, resizeSchema, settingsSchema, startSchema, discussionSchema, continueDiscussionSchema, skillEnrichSchema, type DiscussionState, type PaneId, type Result, type Settings, type TerminalEvent, type TerminalAttach } from './contracts';
 
@@ -148,6 +149,9 @@ export async function createBackend(host: BackendHost) {
   handle('provider:info',value=>providerReader.read(paneIdSchema.parse(value)));
   handle('market:list',async value=>{const result=await skillMarket.get(value);await skillInstaller.scan(result.skills);return result;});
   handle('market:link',value=>skillMarket.link(value));
+  const uploads=uploadDir(host.home);void pruneUploads(uploads);
+  // Desktop IPC carries the bytes directly; the web server posts them over HTTP.
+  handle('upload:image',value=>{if(!(value instanceof Uint8Array))throw new Error('圖片資料格式不符。');return saveUpload(uploads,value);});
   handle('market:enrich',value=>{const request=skillEnrichSchema.parse(value);return skillSummaries.translate([...new Set(request.ids)],request.provider);});
   handle('market:cancel-translation',()=>{skillSummaries.cancel();return null;});
   handle('skill:install',value=>skillInstaller.install(value));
@@ -196,7 +200,7 @@ export async function createBackend(host: BackendHost) {
     catch (error) { return { ok: false, error: error instanceof z.ZodError ? '輸入格式不符：' + error.issues.map(i => i.message).join('；') : error instanceof Error ? error.message : String(error) }; }
   }
   return {
-    handlers, notifications, invoke, env,
+    handlers, notifications, invoke, env, uploads,
     get settings() { return settings; },
     checkProjectChange,
     // Only the project picker may change the working folders.

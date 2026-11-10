@@ -31,3 +31,27 @@
    while hidden; display:none would leave them blank when shown again. */
 .workspace.single{position:relative}
 .workspace.single .pane-slot.background{position:absolute;inset:0;visibility:hidden;pointer-events:none}
+/* Collapsed header: brand, agent picker, project and actions share one row. */
+.app-shell.compact .app-header{padding:8px 14px;gap:8px 12px;justify-content:flex-start}
+.app-shell.compact .brand{gap:8px}
+.app-shell.compact .brand-logo{width:26px;height:28px;font-size:20px;border-radius:7px}
+.app-shell.compact .brand h1{font-size:14px;white-space:nowrap}
+.app-shell.compact .brand p,.app-shell.compact .project-bar .eyebrow,.app-shell.compact .agent-choice small,.app-shell.compact .folder-icon,.app-shell.compact .pane-footer{display:none}
+.app-shell.compact .project-bar{margin:0;padding:0;border:0;background:none;flex:1 1 420px;min-width:0;gap:8px;flex-wrap:wrap}
+.app-shell.compact .agent-picker{flex-direction:row}
+.app-shell.compact .project-path{min-width:0;flex:0 1 auto}
+.app-shell.compact .project-path strong{display:block;max-width:260px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:12px}
+.app-shell.compact .layout-controls{padding-left:8px}
+.app-shell.compact .header-actions{margin-left:auto;gap:6px}
+.app-shell.compact .app-header button,.app-shell.compact .header-link{padding:5px 9px;font-size:12px}
+.app-shell.compact .notice{margin-bottom:6px}
+.app-shell.compact .app-footer{padding:5px 14px}
+.header-toggle{border-style:dashed}
+.app-shell.compact .header-actions .local-badge{display:none}
+.app-shell.compact .pane-header{padding:6px 10px}
+.app-shell.compact .agent-mark{width:24px;height:24px;font-size:13px;border-radius:7px}
+.app-shell.compact .pane-header h2{font-size:13px;display:inline;margin-right:8px}
+.app-shell.compact .pane-title>div{display:flex;align-items:baseline;gap:6px}
+.app-shell.compact .command-line{padding:0 10px 6px;min-height:20px}
+.app-shell.compact .terminal-toolbar{padding:2px 4px}
+.app-shell.compact .terminal-frame{padding:6px 6px 6px 8px}

@@ -22,6 +22,25 @@ export default function TerminalPane({ id, command, model, project, fontSize, on
   const [error, setError] = useState('');
   const [pid, setPid] = useState<number>();
   const [copied, setCopied] = useState(false);
+  const [uploading, setUploading] = useState(0);
+  const imageInput = useRef<HTMLInputElement>(null);
+  // Images are saved on the machine running the CLI and their path is typed
+  // into the prompt, so a remote browser never sends a path from its own disk.
+  const insertImages = useRef<(files: File[]) => Promise<void>>(async () => {});
+  insertImages.current = async files => {
+    const images = files.filter(file => file.type.startsWith('image/'));
+    if (!images.length) { setError('只能插入圖片檔（PNG、JPEG、GIF、WebP）。'); return; }
+    if (!session.current) { setError('請先啟動終端，再插入圖片。'); return; }
+    setUploading(count => count + images.length);
+    try {
+      for (const image of images) {
+        const result = await window.desk.uploadImage(image);
+        if (!result.ok) { setError(result.error); break; }
+        if (!session.current) break;
+        term.current?.paste((/\s/.test(result.value) ? `"${result.value}"` : result.value) + ' ');
+      }
+    } finally { setUploading(count => Math.max(0, count - images.length)); term.current?.focus(); }
+  };
   const [showSkills, setShowSkills] = useState(false);
   const [localize, setLocalize] = useState(false);
   const localizeRef = useRef(false); localizeRef.current = localize;
@@ -91,7 +110,12 @@ export default function TerminalPane({ id, command, model, project, fontSize, on
     });
     // xterm's context-menu text area uses the native paste event. Route through
     // terminal.paste so bracketed-paste support is preserved.
-    const pasteListener = (event: ClipboardEvent) => { event.preventDefault(); event.stopPropagation(); terminal.paste(event.clipboardData?.getData('text/plain') || ''); };
+    const pasteListener = (event: ClipboardEvent) => {
+      event.preventDefault(); event.stopPropagation();
+      const files = [...(event.clipboardData?.files || [])].filter(file => file.type.startsWith('image/'));
+      if (files.length) { void insertImages.current(files); return; }
+      terminal.paste(event.clipboardData?.getData('text/plain') || '');
+    };
     container.current!.addEventListener('paste', pasteListener, true);
     let frame = 0,alive=true;
     const fitLater=()=>{cancelAnimationFrame(frame);frame=requestAnimationFrame(()=>{if(alive&&container.current?.clientWidth)fitter.fit();});};
@@ -146,11 +170,11 @@ export default function TerminalPane({ id, command, model, project, fontSize, on
   const names = { idle: '待命', starting: '啟動中', running: '執行中', stopping: '停止中', exited: '已結束', error: '啟動失敗' };
   return <section className={`terminal-pane ${id}`} data-testid={`pane-${id}`} aria-label={labels[id]}>
     <header className="pane-header"><div className="pane-title"><span className="agent-mark">{id === 'hermes' ? 'H' : id === 'claude' ? 'C' : id === 'codex' ? 'X' : 'A'}</span><div><h2>{labels[id]}</h2><span className={`status ${status}`}><i />{names[status]}{pid ? ` · PID ${pid}` : ''}</span></div></div><button className="icon-button" aria-label={`${labels[id]} 設定`} title="啟動設定" onClick={onSettings}>⚙</button></header>
-    <div className="command-line" title={[command.executable,...command.args].join(' ')}><span>›</span> {command.executable}{command.args.length > 0 ? ` ${command.args.join(' ')}` : ''}<button className="model-button" onClick={onModels} title="下次啟動套用；目前工作階段可手動輸入 /model">模型：{model||'CLI 預設'}</button><button className="model-button" onClick={() => setShowSkills(true)} aria-label={`${labels[id]} 選擇 Skill`}>Skills</button>{id !== 'antigravity' && <button className="model-button" aria-pressed={localize} aria-label={`${labels[id]} 繁體中文顯示`} title="實驗功能：只轉換切換後的新輸出；啟動前開啟可翻譯啟動畫面。可能影響一般輸出，不修改 CLI 或輸入。" onClick={() => { clearTimeout(translationTimer.current); const pending = translator.current.drain(); if (pending) term.current?.write(pending); setLocalize(value => !value); }}>繁中{localize ? ' ✓' : ''}</button>}</div>
+    <div className="command-line" title={[command.executable,...command.args].join(' ')}><span>›</span> {command.executable}{command.args.length > 0 ? ` ${command.args.join(' ')}` : ''}<button className="model-button" onClick={onModels} title="下次啟動套用；目前工作階段可手動輸入 /model">模型：{model||'CLI 預設'}</button><button className="model-button" onClick={() => setShowSkills(true)} aria-label={`${labels[id]} 選擇 Skill`}>Skills</button><button className="model-button" disabled={!running || uploading > 0} aria-label={`${labels[id]} 插入圖片`} title={running ? '上傳圖片到執行 CLI 的主機，並把檔案路徑插入輸入列（不會送出）。也可以直接貼上或拖曳圖片。' : '先啟動 CLI'} onClick={() => imageInput.current?.click()}>{uploading ? '上傳中…' : '圖片'}</button><input ref={imageInput} type="file" accept="image/png,image/jpeg,image/gif,image/webp" multiple hidden data-testid={`image-input-${id}`} onChange={event => { const files = [...(event.target.files || [])]; event.target.value = ''; if (files.length) void insertImages.current(files); }} />{id !== 'antigravity' && <button className="model-button" aria-pressed={localize} aria-label={`${labels[id]} 繁體中文顯示`} title="實驗功能：只轉換切換後的新輸出；啟動前開啟可翻譯啟動畫面。可能影響一般輸出，不修改 CLI 或輸入。" onClick={() => { clearTimeout(translationTimer.current); const pending = translator.current.drain(); if (pending) term.current?.write(pending); setLocalize(value => !value); }}>繁中{localize ? ' ✓' : ''}</button>}</div>
     {localize && <div className="translation-notice" role="status">繁中顯示已開啟；僅翻譯新輸出，啟動畫面需重新啟動 CLI。</div>}
     <div className="terminal-toolbar"><div><button disabled={busy || running || !project} onClick={() => void start()}>▶ 啟動</button><button disabled={!running || busy} onClick={() => void stop()}>■ 停止</button><button disabled={!running || busy} onClick={() => void stop(true)}>↻ 重啟</button></div><div><button title="選取文字後複製" onClick={() => void copySelection()}>{copied ? '已複製' : '複製'}</button><button onClick={() => void paste()} disabled={!running}>貼上</button><button title="清除畫面，不會停止程序" onClick={() => term.current?.clear()}>清屏</button></div></div>
     {error && <div role="alert" className="pane-error">{error}<button aria-label="關閉訊息" onClick={() => setError('')}>×</button></div>}
-    <div className="terminal-frame"><div className="terminal-surface" ref={container} data-testid={`terminal-${id}`} /></div>
+    <div className="terminal-frame" onDragOver={event => { if (event.dataTransfer.types.includes('Files')) event.preventDefault(); }} onDrop={event => { const files = [...event.dataTransfer.files]; if (!files.length) return; event.preventDefault(); void insertImages.current(files); }}><div className="terminal-surface" ref={container} data-testid={`terminal-${id}`} /></div>
     <footer className="pane-footer"><span>獨立 PTY</span><span>{running ? 'Ctrl+C 中斷 · 輸入直接送往 CLI' : '由你決定何時啟動'}</span></footer>
     {showSkills && <LocalSkillPicker id={id} project={project} running={running} onClose={() => setShowSkills(false)} onInsert={text => { term.current?.paste(text); term.current?.focus(); }} />}
   </section>;

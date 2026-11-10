@@ -71,6 +71,13 @@ async function writeClipboard(text: string): Promise<Result<null>> {
     return copied ? { ok: true, value: null } : { ok: false, error: '瀏覽器不允許寫入剪貼簿，請用 HTTPS 連線或手動複製。' };
   }
 }
+async function uploadImage(image: Blob): Promise<Result<string>> {
+  try {
+    const response = await fetch(webPath('/api/upload'), { method: 'POST', body: image, headers: { 'Content-Type': 'application/octet-stream' }, credentials: 'same-origin' });
+    const result = await response.json().catch(() => ({}));
+    return response.ok && typeof result.path === 'string' ? { ok: true, value: result.path } : { ok: false, error: result.error || `上傳失敗（HTTP ${response.status}）。` };
+  } catch { return { ok: false, error: '無法連線到主機，圖片未上傳。' }; }
+}
 async function readClipboard(): Promise<Result<string>> {
   try { return { ok: true, value: (await navigator.clipboard.readText()).slice(0, 1024 * 1024) }; }
   catch {
@@ -130,6 +137,7 @@ export function installWebDesk() {
     resize: (id, session, cols, rows) => call('terminal:resize', { id, session, cols, rows }),
     ack: () => {},
     attachTerminal: id => call('terminal:attach', id),
+    uploadImage,
     readClipboard,
     writeClipboard,
     onTerminal: listener => on('terminal:event', listener)
