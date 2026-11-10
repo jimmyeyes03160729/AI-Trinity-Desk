@@ -25,7 +25,7 @@ export class LocalSkills {
     const user = skillRoots(this.home)[ai];
     const scopes: { scope: Request['scope']; root: string }[] = [{ scope: 'user', root: user }];
     if (ai === 'codex') scopes.push({ scope: 'legacy', root: path.join(this.home, '.codex', 'skills') });
-    if (project) scopes.push({ scope: 'project', root: path.join(project, ai === 'claude' ? '.claude' : '.agents', 'skills') });
+    if (project) scopes.push({ scope: 'project', root: path.join(project, ai === 'claude' ? '.claude' : ai === 'hermes' ? '.hermes' : '.agents', 'skills') });
     return scopes;
   }
   private async init() {

@@ -3,9 +3,9 @@ import {createHash,randomUUID} from 'node:crypto';
 import {lstat,mkdir,readFile,writeFile,rename,rm} from 'node:fs/promises';
 import path from 'node:path';
 import type {MarketSkill,PaneId,SkillInstallState} from './contracts';
-import {skillInstallSchema} from './contracts';
+import {paneIds,skillInstallSchema} from './contracts';
 
-export function skillRoots(home:string):Record<PaneId,string>{return {claude:path.join(home,'.claude','skills'),codex:path.join(home,'.agents','skills'),antigravity:path.join(home,'.gemini','antigravity-cli','skills')};}
+export function skillRoots(home:string):Record<PaneId,string>{return {hermes:path.join(home,'.hermes','skills'),claude:path.join(home,'.claude','skills'),codex:path.join(home,'.agents','skills'),antigravity:path.join(home,'.gemini','antigravity-cli','skills')};}
 export function archivePath(name:string){
   if(!name||name.startsWith('/')||name.includes('\\')||/[\x00-\x1f:]/.test(name)||name.split('/').includes('..')||name.split('/').includes('.'))throw new Error('Skill 封存檔含不安全路徑。');
   return name;
@@ -53,12 +53,12 @@ export class SkillInstaller{
   constructor(private lookup:(id:string)=>MarketSkill,private roots:Record<PaneId,string>,private file:string,private transport:typeof fetch,private emit:(states:SkillInstallState[])=>void){}
   get active(){return this.controllers.size>0;}
   private key(id:string,ai:PaneId){return id+'|'+ai;}
-  private async init(){if(!this.initialized)this.initialized=(async()=>{try{const data=JSON.parse(await readFile(this.file,'utf8'));for(const record of data.slice(0,1000))if(typeof record.id==='string'&&['claude','codex','antigravity'].includes(record.ai)&&record.status==='installed'){const slug=record.id.split('/').at(-1);if(/^[a-zA-Z0-9][\w.-]{0,119}$/.test(slug)&&record.folder===path.join(this.roots[record.ai as PaneId],slug))this.states.set(this.key(record.id,record.ai),record);}}catch{}})();await this.initialized;}
+  private async init(){if(!this.initialized)this.initialized=(async()=>{try{const data=JSON.parse(await readFile(this.file,'utf8'));for(const record of data.slice(0,1000))if(typeof record.id==='string'&&paneIds.includes(record.ai)&&record.status==='installed'){const slug=record.id.split('/').at(-1);if(/^[a-zA-Z0-9][\w.-]{0,119}$/.test(slug)&&record.folder===path.join(this.roots[record.ai as PaneId],slug))this.states.set(this.key(record.id,record.ai),record);}}catch{}})();await this.initialized;}
   private publish(){this.emit([...this.states.values()].map(s=>({...s})));}
   private set(state:SkillInstallState){this.states.set(this.key(state.id,state.ai),state);this.publish();}
   private async save(){await mkdir(path.dirname(this.file),{recursive:true});await writeFile(this.file+'.tmp',JSON.stringify([...this.states.values()].filter(s=>s.status==='installed')),{encoding:'utf8',mode:0o600});await rename(this.file+'.tmp',this.file);}
   async snapshot(){await this.init();for(const [key,state] of this.states)if(state.status==='installed'&&!(await lstat(path.join(state.folder!,'SKILL.md')).catch(()=>undefined))?.isFile())this.states.delete(key);return [...this.states.values()];}
-  async scan(skills:MarketSkill[]){await this.init();for(const skill of skills)for(const ai of ['claude','codex','antigravity'] as const){const key=this.key(skill.id,ai);if(this.states.has(key))continue;const folder=path.join(this.roots[ai],skill.slug);if(await lstat(folder).catch(()=>undefined))this.states.set(key,{id:skill.id,ai,status:'existing',folder,message:'此 AI 的同名位置已存在，來源尚未確認；不會覆寫。'});}this.publish();return this.snapshot();}
+  async scan(skills:MarketSkill[]){await this.init();for(const skill of skills)for(const ai of paneIds){const key=this.key(skill.id,ai);if(this.states.has(key))continue;const folder=path.join(this.roots[ai],skill.slug);if(await lstat(folder).catch(()=>undefined))this.states.set(key,{id:skill.id,ai,status:'existing',folder,message:'此 AI 的同名位置已存在，來源尚未確認；不會覆寫。'});}this.publish();return this.snapshot();}
   cancel(id:string){this.controllers.get(id)?.abort();}
   async shutdown(){for(const controller of this.controllers.values())controller.abort();await this.queue.catch(()=>{});}
   install(input:unknown):Promise<SkillInstallState[]>{

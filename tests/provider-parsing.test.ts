@@ -13,7 +13,7 @@ test('model catalogs filter hidden rows and parse CLI model IDs without assuming
   assert.deepEqual(agyModels('gemini-demo-high    Gemini Demo (High)\ninvalid heading\n'),[{id:'gemini-demo-high',name:'Gemini Demo (High)'}]);
 });
 test('visibility settings preserve old defaults and reject empty or duplicate selection',()=>{
-  const old:any=defaultSettings();delete old.visiblePanes;assert.deepEqual(settingsSchema.parse(old).visiblePanes,['claude','antigravity','codex']);
+  const old:any=defaultSettings();delete old.visiblePanes;assert.deepEqual(settingsSchema.parse(old).visiblePanes,['hermes','claude','antigravity','codex']);
   assert.equal(settingsSchema.safeParse({...defaultSettings(),visiblePanes:[]}).success,false);
   assert.equal(settingsSchema.safeParse({...defaultSettings(),visiblePanes:['codex','codex']}).success,false);
   assert.deepEqual(settingsSchema.parse({...defaultSettings(),visiblePanes:['codex']}).visiblePanes,['codex']);

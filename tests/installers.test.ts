@@ -78,25 +78,25 @@ test('missing tools install serially, deduplicate requests, retain script digest
   });
   manager.request(['claude','antigravity','codex']);manager.request(['claude']); await settle(manager);
   assert.deepEqual(ran,['claude','agy','codex']);assert.equal(max,1);
-  for(const state of manager.snapshot){assert.equal(state.status,'ready');assert.match(state.log,/SHA-256：[a-f0-9]{64}/);assert.ok(state.path);}
+  for(const state of manager.snapshot.filter(s=>s.id!=='hermes')){assert.equal(state.status,'ready');assert.match(state.log,/SHA-256：[a-f0-9]{64}/);assert.ok(state.path);}
   manager.request(['claude']);await settle(manager);assert.equal(ran.length,3);await manager.shutdown();
 });
 test('pre-existing and custom executables do not download or replace installed tools',async()=>{
   const settings=defaultSettings();settings.commands.codex.executable='/custom/codex';let downloads=0;
   const manager=new InstallerManager(()=>settings,{},os.tmpdir(),()=>{},'win32',{resolve:async()=>'/existing',download:async()=>{downloads++;return 'script';}});
-  manager.request(['claude','codex']);await settle(manager);assert.equal(downloads,0);assert.equal(manager.snapshot[0].status,'ready');assert.equal(manager.snapshot[2].status,'custom');await manager.shutdown();
+  manager.request(['claude','codex']);await settle(manager);assert.equal(downloads,0);assert.equal(manager.snapshot[1].status,'ready');assert.equal(manager.snapshot[3].status,'custom');await manager.shutdown();
 });
 test('download failure is visible, retry works, and a missing post-install executable fails closed',async()=>{
   const root=await mkdtemp(path.join(os.tmpdir(),'trinity-retry-'));let attempts=0;
   const manager=new InstallerManager(defaultSettings,{},root,()=>{},'win32',{resolve:async()=>null,download:async()=>{attempts++;if(attempts===1)throw new Error('network offline');return 'script';},run:async()=>{}});
-  manager.request(['codex']);await settle(manager);assert.equal(manager.snapshot[2].status,'error');assert.match(manager.snapshot[2].message,/network offline/);
-  manager.request(['codex']);await settle(manager);assert.equal(attempts,2);assert.match(manager.snapshot[2].message,/尚未找到 CLI/);await manager.shutdown();
+  manager.request(['codex']);await settle(manager);assert.equal(manager.snapshot[3].status,'error');assert.match(manager.snapshot[3].message,/network offline/);
+  manager.request(['codex']);await settle(manager);assert.equal(attempts,2);assert.match(manager.snapshot[3].message,/尚未找到 CLI/);await manager.shutdown();
 });
 test('running download and queued installations can be cancelled without continuing the queue',async()=>{
   let entered=false;
   const manager=new InstallerManager(defaultSettings,{},os.tmpdir(),()=>{},'win32',{resolve:async()=>null,download:async(_url,signal)=>{entered=true;await new Promise<void>((_resolve,reject)=>signal.addEventListener('abort',()=>reject(new Error('aborted')),{once:true}));return 'script';}});
   manager.request(['claude','codex']); while(!entered)await pause(1);
-  await manager.cancel('codex');assert.equal(manager.snapshot[2].status,'cancelled');await manager.shutdown();assert.equal(manager.active,false);assert.equal(manager.snapshot[0].status,'cancelled');
+  await manager.cancel('codex');assert.equal(manager.snapshot[3].status,'cancelled');await manager.shutdown();assert.equal(manager.active,false);assert.equal(manager.snapshot[1].status,'cancelled');
 });
 test('real local installer process streams output and propagates nonzero exit without running vendor scripts',async()=>{
   const root=await mkdtemp(path.join(os.tmpdir(),'trinity-runner-'));const file=path.join(root,process.platform==='win32'?'fixture.ps1':'fixture.sh');

@@ -45,6 +45,8 @@ try{
   },{bundle,profile});
   await page.getByRole('button',{name:'Skills 熱門市場',exact:true}).click();
   const panel=page.getByRole('region',{name:'Skills 熱門市場',exact:true});await expect(panel.getByTestId('skill-market-card')).toHaveCount(4);
+  // Hermes translates by default; this fixture models the Claude CLI.
+  await panel.getByLabel('Summary 翻譯用 AI').selectOption('claude');
   await expect(panel.getByText('累計安裝 12,345',{exact:true})).toBeVisible();
   await panel.getByRole('button',{name:'專案推薦',exact:true}).click();await expect(panel.getByRole('alert')).toContainText('選擇專案');
   await app.evaluate(({dialog},folder)=>{dialog.showOpenDialog=async()=>({canceled:false,filePaths:[folder]});},project);
@@ -59,7 +61,7 @@ try{
   await react.getByText('Summary 原文與來源時間',{exact:true}).click();await expect(react).toContainText('Helps React and TypeScript applications.');
   await react.getByRole('button',{name:'一鍵安裝至所選 AI',exact:true}).click();
   await expect(react.getByRole('button',{name:'已安裝至所選 AI',exact:true})).toBeVisible({timeout:15000});
-  await expect(react.locator('.skill-installed-targets .installed')).toHaveCount(3);await expect(react.locator('.skill-installed-targets')).toContainText('Antigravity CLI');
+  await expect(react.locator('.skill-installed-targets .installed')).toHaveCount(4);await expect(react.locator('.skill-installed-targets')).toContainText('Hermes Agent');await expect(react.locator('.skill-installed-targets')).toContainText('Antigravity CLI');
   await panel.locator('.market-content').evaluate(node=>{node.scrollTop=0;});
   await page.screenshot({path:path.join(artifacts,`${prefix}skill-market-recommended.png`)});
   await panel.getByRole('textbox',{name:'搜尋 Skills',exact:true}).fill('測試');await panel.getByRole('button',{name:'搜尋',exact:true}).click();

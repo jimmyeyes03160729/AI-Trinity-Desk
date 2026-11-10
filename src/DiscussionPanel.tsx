@@ -12,7 +12,7 @@ export default function DiscussionPanel({settings,onActive,onClose}:{settings:Se
   const [topic,setTopic]=useState('');
   const [instruction,setInstruction]=useState('');
   const [autoStopAgreement,setAutoStopAgreement]=useState(true),[now,setNow]=useState(Date.now());
-  const [participants,setParticipants]=useState<PaneId[]>(settings.visiblePanes.length>=2?[...settings.visiblePanes]:[...paneIds]);
+  const [participants,setParticipants]=useState<PaneId[]>([...paneIds]);
   const [rounds,setRounds]=useState(2),[timeout,setTimeoutSeconds]=useState(180);
   const [error,setError]=useState(''),[busy,setBusy]=useState(false),[copied,setCopied]=useState(false);
   const [follow,setFollow]=useState(true);

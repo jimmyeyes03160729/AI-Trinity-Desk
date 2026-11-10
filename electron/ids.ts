@@ -1,4 +1,5 @@
-export const paneIds = ['claude', 'antigravity', 'codex'] as const;
+// Hermes is the default agent; the others remain selectable.
+export const paneIds = ['hermes', 'claude', 'antigravity', 'codex'] as const;
 type Projects = { projectMode: 'shared' | 'separate'; projectPath: string; projectPaths: Record<typeof paneIds[number], string> };
 // The folder a pane's CLI runs in. In separate mode a pane without its own
 // folder falls back to the shared one.

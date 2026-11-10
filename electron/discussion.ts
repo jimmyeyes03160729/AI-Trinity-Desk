@@ -7,7 +7,7 @@ import {continueDiscussionSchema,discussionSchema,extendDiscussionSchema,retryDi
 import {launchSpec,resolveExecutable} from './commands';
 import {TurnClock,DiscussionTimeoutError,agreementReply} from './discussion-clock';
 
-const names:Record<PaneId,string>={claude:'Claude Code',antigravity:'Antigravity CLI',codex:'Codex CLI'};
+const names:Record<PaneId,string>={hermes:'Hermes Agent',claude:'Claude Code',antigravity:'Antigravity CLI',codex:'Codex CLI'};
 const maxReply=12000;
 export function discussionPrompt(config:DiscussionConfig,messages:DiscussionMessage[],id:PaneId,round:number,batches:DiscussionBatch[]=[],endRound=config.rounds){
   const recent:DiscussionMessage[]=[];let length=0;
@@ -32,7 +32,12 @@ export function discussionPrompt(config:DiscussionConfig,messages:DiscussionMess
 // These arguments are selected by the application, never taken from AI output.
 // All prompts travel through stdin, avoiding shell/command-line interpretation.
 export function discussionArgs(id:PaneId,model:string){
-  const base=id==='claude'
+  // Hermes reads the prompt from stdin, answers once and exits; only the
+  // todo toolset stays enabled, so it has no terminal, file or web access.
+  // The source tag keeps these runs out of Hermes' own session pickers.
+  const base=id==='hermes'
+    ?['chat','--query-file','-','--oneshot','--format','stream-json','--source','tool','--toolsets','todo']
+    :id==='claude'
     ?['--print','--output-format','json','--tools=','--disallowedTools','mcp__*','--strict-mcp-config','--disable-slash-commands','--no-session-persistence','--permission-mode','dontAsk']
     :id==='codex'
       ?['exec','--json','--sandbox','read-only','--skip-git-repo-check','--ephemeral','--color','never','-c','approval_policy="never"']
@@ -61,7 +66,12 @@ export function parseDiscussionReply(id:PaneId,stdout:string):string{
     let completed=false;const parts:string[]=[];
     for(const line of clean.split(/\r?\n/)){
       let value:any;try{value=JSON.parse(line);}catch{continue;}
-      if(id==='codex'){
+      if(id==='hermes'){
+        if(value.type!=='result')continue;
+        if(value.error||value.exit_code!==0)throw new Error(typeof value.error==='string'?value.error:value.error?.message||`Hermes 回覆失敗（代碼 ${value.exit_code}）。`);
+        if(typeof value.text==='string')parts.push(value.text);
+        completed=true;
+      }else if(id==='codex'){
         if(value.type==='turn.failed'||value.type==='error')throw new Error(value.error?.message||value.message||'Codex 回覆失敗。');
         if(value.type==='item.completed'&&value.item?.type==='agent_message'&&typeof value.item.text==='string')parts.push(value.item.text);
         if(value.type==='turn.completed')completed=true;

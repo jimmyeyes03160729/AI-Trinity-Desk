@@ -5,7 +5,7 @@ import path from 'node:path';
 import {StringDecoder} from 'node:string_decoder';
 import type {PaneId,ProviderInfo,Settings} from './contracts';
 import {launchSpec,resolveExecutable} from './commands';
-import {agyModels,codexModels,codexWindows} from './provider-parsing';
+import {agyModels,codexModels,codexWindows,hermesWindows} from './provider-parsing';
 
 // Only metadata methods are sent. No thread/start, turn/start, login or account
 // mutation is exposed through IPC or this app-server connection.
@@ -67,6 +67,14 @@ export class ProviderReader{
         return {...base,models:codexModels(value.models),windows,message:value.error||(windows.length?'帳號額度由 Codex 服務提供；可能與其他裝置共用。':'服務未提供可顯示的帳號額度。請確認登入方式，或在 CLI 內輸入 /status 查看。'),source:'Codex app-server：model/list、account/rateLimits/read'};
       }
       const run=async(args:string[])=>{const spec=launchSpec(executable,{executable,args});return promisify(execFile)(spec.file,spec.args,{cwd,env:this.env,windowsHide:true,timeout:25000,maxBuffer:1024*1024});};
+      if(id==='hermes'){
+        // Hermes picks the provider and model from its own configuration, so
+        // there is no fixed model list; only account windows are read here.
+        const help='Hermes 會依自己的設定選擇 AI 供應商與模型。要切換，在 Hermes 終端輸入 /model，或在主機執行 hermes model 新增供應商。';
+        try{const {stdout}=await run(['usage','--json']);const value=JSON.parse(stdout);const windows=hermesWindows(value);
+          return {...base,windows,usageText:windows.length?undefined:(Array.isArray(value.details)?value.details.join('\n'):value.unavailable_reason||undefined),message:(windows.length?`帳號額度由 ${value.provider||'目前供應商'} 提供。`:'目前供應商未回報額度視窗。')+help,source:'hermes usage --json'};}
+        catch{return {...base,message:'目前的供應商沒有額度查詢介面或尚未登入（支援 Codex、Anthropic、OpenRouter）。可在 Hermes 終端輸入 /usage。'+help,source:'hermes usage --json'};}
+      }
       const [models,usage]=await Promise.allSettled([run(['models']),run(['--disable-slash-commands=false','--print-timeout','15','--print','/usage'])]);
       return {...base,models:models.status==='fulfilled'?agyModels(models.value.stdout):[],usageText:usage.status==='fulfilled'?usage.value.stdout.replace(/\x1b\[[0-9;?]*[A-Za-z]/g,'').trim().slice(0,20000):undefined,message:usage.status==='fulfilled'?'下方顯示 Antigravity CLI 原始額度報告。':'Antigravity 額度讀取失敗或尚未登入。請在該 CLI 輸入 /usage；服務的地區限制仍適用。',source:'Antigravity CLI：agy models、agy --print /usage'};
     }catch(error){return {...base,message:error instanceof Error?error.message:'讀取失敗，請使用 CLI 內建用量指令。'};}
